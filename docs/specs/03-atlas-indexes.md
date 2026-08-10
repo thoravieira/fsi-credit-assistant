@@ -92,7 +92,7 @@ the second fallback rather than the design. **Do not adopt it pre-emptively.**
 
 ## Acceptance criteria
 
-- [ ] `scripts/00_check_atlas.py` runs green against the real M0 cluster and prints all four
+- [ ] `scripts/00_check_atlas.py` runs green against the real M10 cluster and prints all four
       reports from §3.
 - [ ] The actual index limit is written into [15 — Risks](15-risks-and-open-items.md),
       replacing "unconfirmed".
