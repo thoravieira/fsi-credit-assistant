@@ -16,7 +16,7 @@
 | 3 | Venue network fails | Demo dies | Enable Docker Desktop WSL integration and validate the `mongodb/mongodb-atlas-local` compose path as an offline fallback. **Also record a screen capture of a full successful run on Thursday.** | Day 2 / Day 4 |
 | 4 | Docker not currently available in this WSL distro | The "reproduce locally" deliverable ships untested | Enable integration Day 1–2. If not enabled by Wednesday, mark the compose file explicitly as untested in the README rather than implying it works | Day 2 |
 | 5 | Executing model writes pre-2026 APIs (`AsyncMongoDBSaver`, `astream_events(version="v2")`, `filter=` instead of `pre_filter=`) | Hours lost debugging | [13](13-verified-api-contract.md) is authoritative and must be cited in every implementation task | Continuous |
-| 6 | LLM latency during live negotiation | Awkward silences on stage | Cap `max_tokens`, stream tokens (already in the SSE contract), pre-warm the connection at app start | Day 3 |
+| 6 | **Deep Agent latency during live negotiation** | 15 s+ of silence in front of the panel | Deep Agents adds planning plus a round trip per subagent delegation. Stream tokens, render subagent delegation as trace steps, cap iterations, and keep the `AGENT_MODE=deep\|react` fallback flag. **Measure median turn latency Wednesday.** [06 §6](06-negotiation-agent.md) | **Day 3** |
 | 7 | Voyage free-tier key not obtained in time | Blocks embeddings | The factory already supports OpenAI at the same 1024 dims; switching is one env var plus `--reembed` ([08 §1](08-retrieval.md)) | Day 1 |
 | 8 | Scope overrun on the Next.js frontend | Backend unfinished | Frontend is explicitly cuttable. **The backend must be `curl`-demonstrable by end of Day 2** | Day 2 |
 

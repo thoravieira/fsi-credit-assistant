@@ -31,7 +31,7 @@ flowchart TB
         CRESP[customer_response]
         PREC[precedent_search]
         BRIEF[analyst_brief]
-        NEG["negotiation · ReAct + 4 tools"]
+        NEG["negotiation · Deep Agent<br/>2 tools + 2 subagents"]
         WAIT["await_approval · interrupt()"]
         PERSIST[persist_decision]
     end

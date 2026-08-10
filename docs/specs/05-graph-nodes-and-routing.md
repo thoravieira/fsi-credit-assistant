@@ -24,7 +24,7 @@ here.
 | `customer_response` | LLM | Write Mariana's answer in plain Portuguese, grounded in `policies` + `calc`. Also handles the "missing fields" branch. |
 | `precedent_search` | vector search | `$vectorSearch` on `historical_cases`, `pre_filter` by product. k=3. |
 | `analyst_brief` | LLM | Produce the case dossier: recommendation + explainability + precedent citations. |
-| `negotiation` | **ReAct agent** | See [06](06-negotiation-agent.md). **[OPUS]** |
+| `negotiation` | **Deep Agent** | Wrapper node around `create_deep_agent` with 2 subagents. See [06](06-negotiation-agent.md). **[OPUS]** |
 | `await_approval` | `interrupt()` | Pause and persist before any write to `decisions_log`. |
 | `persist_decision` | deterministic | Write log entry, new precedent (with embedding), memory updates. |
 

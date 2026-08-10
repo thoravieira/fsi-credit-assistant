@@ -144,6 +144,23 @@ the panel asks "why didn't you…?"
 
 ---
 
+## The three-layer stack
+
+Tools are chosen per problem type, not by applying the newest one everywhere. Detail in
+[06 §1](06-negotiation-agent.md).
+
+| Layer | Technology | Where |
+|---|---|---|
+| Conversation | **LangChain** | `intake`, `customer_response`, `analyst_brief` |
+| Workflow | **LangGraph** | `router` → `decision`, `persist_decision`, `await_approval` |
+| Reasoning | **Deep Agents** | `negotiation` only |
+
+The `router` is **deterministic Python**, not an LLM. An LLM at the entry point of every
+request adds latency and a failure mode to the one component that must never be
+unpredictable. LangChain is the LLM *interaction* layer, not the dispatch layer.
+
+---
+
 ## Conventions
 
 - **Repository language is English** (code, comments, docs, ADRs, diagrams).

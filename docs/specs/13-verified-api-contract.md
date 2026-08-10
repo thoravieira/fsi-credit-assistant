@@ -20,6 +20,8 @@ langchain-mongodb==0.11.0
 langchain-voyageai==0.4.0
 langchain-openai==1.4.3
 langchain-core==1.5.3
+deepagents==0.7.5
+langchain==1.3.14          # pulled in by deepagents (agent middleware lives here)
 pymongo==4.16.0
 ```
 
@@ -220,6 +222,71 @@ Voyage `voyage-4` family, January 2026: `voyage-4-lite` ($0.02/1M), `voyage-4` (
 256/512/1024/2048, 32K context. Free tier: 200M tokens.
 
 Note the parameter names differ: `output_dimension` (Voyage) vs `dimensions` (OpenAI).
+
+---
+
+## 6b. Deep Agents
+
+```python
+from deepagents import create_deep_agent, SubAgent, DeepAgentState
+
+create_deep_agent(
+    model: str | BaseChatModel | None = None,
+    tools: Sequence[BaseTool | Callable | dict] | None = None,
+    *,
+    system_prompt: str | SystemMessage | None = None,
+    middleware: Sequence[AgentMiddleware] = (),
+    subagents: Sequence[SubAgent | CompiledSubAgent | AsyncSubAgent] | None = None,
+    skills: list[str] | None = None,
+    memory: list[str] | None = None,
+    permissions: list[FilesystemPermission] | None = None,
+    backend: BackendProtocol | None = None,
+    interrupt_on: dict[str, bool | InterruptOnConfig] | None = None,
+    response_format: ... | None = None,
+    state_schema: type[DeepAgentState] | None = None,
+    context_schema: type | None = None,
+    checkpointer: None | bool | BaseCheckpointSaver = None,
+    store: BaseStore | None = None,
+    debug: bool = False,
+    name: str | None = None,
+    cache: BaseCache | None = None,
+) -> CompiledStateGraph
+```
+
+**It returns a `CompiledStateGraph`** — it composes with LangGraph natively and accepts the
+same `checkpointer` / `store` objects used by the parent graph.
+
+`SubAgent` is a TypedDict:
+
+```python
+{
+    "name": str,                    # required
+    "description": str,             # required — this is what the main agent routes on
+    "system_prompt": str,           # required
+    "tools": NotRequired[Sequence[BaseTool | Callable | dict]],
+    "model": NotRequired[str | BaseChatModel],
+    "middleware": NotRequired[list[AgentMiddleware]],
+    "interrupt_on": NotRequired[dict[str, bool | InterruptOnConfig]],
+    "skills": NotRequired[list[str]],
+    "permissions": NotRequired[list[FilesystemPermission]],
+    "response_format": NotRequired[...],
+}
+```
+
+`DeepAgentState` fields: `messages` (required), `jump_to`, `structured_response`.
+
+Top-level exports: `AsyncSubAgent`, `AsyncSubAgentMiddleware`, `CompiledSubAgent`,
+`DeepAgentState`, `FilesystemMiddleware`, `FilesystemPermission`, `FsToolName`,
+`GeneralPurposeSubagentProfile`, `HarnessProfile`, `HarnessProfileConfig`,
+`MemoryMiddleware`, `ProviderProfile`, `RubricMiddleware`, `SubAgent`, `SubAgentMiddleware`,
+`create_deep_agent`, `register_harness_profile`, `register_provider_profile`.
+
+Available middleware (`deepagents.middleware`): `SubAgentMiddleware`, `FilesystemMiddleware`,
+`MemoryMiddleware`, `SummarizationMiddleware`, `SummarizationToolMiddleware`,
+`RubricMiddleware`, `SkillsMiddleware`.
+
+> `subagents` takes **plain dicts** matching the `SubAgent` TypedDict — do not look for a
+> `SubAgent(...)` constructor.
 
 ---
 
