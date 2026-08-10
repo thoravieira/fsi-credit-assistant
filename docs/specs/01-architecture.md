@@ -76,23 +76,27 @@ as the version-controlled truth (GitHub renders it natively).
 
 ## 2. The central thesis
 
-One database serves four workloads that a conventional stack splits across four systems:
+One database serves four workloads that a conventional stack splits across four systems.
+**This table is a comparison** — the middle column is the cost of the usual path, the right
+column is what this demo actually runs:
 
-| Workload | Served by | Where |
+| Workload | Conventional stack → **4 systems** | This demo → **1 system** |
 |---|---|---|
-| Operational records | MongoDB | `applications`, `customer_profiles` |
-| Agent state / checkpoints | MongoDB | `checkpoints` (+ TTL index) |
-| Long-term agent memory | MongoDB + Voyage AI | `agent_memories` |
-| Vector search | MongoDB + Voyage AI | `credit_policies`, `historical_cases` |
+| Operational records | PostgreSQL | MongoDB · `applications`, `customer_profiles` |
+| Agent state / checkpoints | Redis | MongoDB · `checkpoints` (+ TTL index) |
+| Long-term agent memory | PostgreSQL + pgvector | MongoDB + Voyage AI · `agent_memories` |
+| Vector search | Pinecone / Weaviate | MongoDB + Voyage AI · `credit_policies`, `historical_cases` |
 
 Fewer moving parts, one consistency model, one driver, one connection pool, one backup
 policy, one access-control surface. This is the argument the demo makes.
 
-> **Talk track for the panel.** The comparison that lands hardest is the one this table
-> replaces: the same four workloads conventionally require PostgreSQL + Redis + pgvector +
-> a dedicated vector database. Say it out loud even though the table does not name
-> competitors — four systems means four failure modes, four consistency models, four
-> upgrade cycles and four security reviews. See [17](17-objection-bank.md).
+> **Talk track for the panel.** Do not just show the table — say the consequence out loud.
+> Four systems means four failure modes, four consistency models, four upgrade cycles,
+> four security reviews, and four sets of credentials in the agent's environment. Then note
+> what the table does *not* claim: **Voyage AI appears in the right column too**, because
+> any vector approach needs an embedding model — that is not a point being scored, it is
+> the same cost on both sides. Being scrupulous about what the comparison does not prove is
+> what makes the part it does prove credible. See [17](17-objection-bank.md).
 
 ---
 
