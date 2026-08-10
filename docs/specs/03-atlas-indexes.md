@@ -49,13 +49,18 @@ Filter fields are declared on the index, not applied afterwards. See
 
 ---
 
-## 3. The M0 index-limit probe ⚠️
+## 3. Cluster probe
 
-**The number of Atlas Search indexes allowed on an M0 free cluster could not be confirmed
-from primary MongoDB documentation.** Third-party sources suggest a limit of 3. The design
-above needs exactly 3, leaving no headroom.
+> **Resolved 2026-08-10: the cluster is a dedicated M10, not M0.** The index-count limit
+> that drove this section no longer applies — dedicated tiers do not impose the low search
+> index cap that shared tiers do, and all three vector indexes fit comfortably. The two
+> fallbacks below are retained as documentation of the reasoning, not as planned work.
+>
+> M10 also removes the latency concern (risk 2) and gives predictable performance for the
+> live demo instead of shared-tier contention. **Confirm the count in the probe anyway** —
+> asserting rather than assuming is the point of the script.
 
-`scripts/00_check_atlas.py` must run before anything else is built and must report:
+`scripts/00_check_atlas.py` still runs before anything else is built, and must report:
 
 1. Connectivity and server version.
 2. Whether 3 vector search indexes can coexist on this cluster — create three throwaway
@@ -65,14 +70,14 @@ above needs exactly 3, leaving no headroom.
    client-side expiry. **Do not claim TTL behaviour on stage without this output.**
 4. Measured p50/p95 latency of a `$vectorSearch` against the seeded corpus.
 
-### Fallback if the limit is 2
+### Fallback if the limit is 2 *(no longer expected on M10)*
 
 Instantiate `MongoDBStore` **without** `index_config`, making long-term memory pure
 key-value. No demo beat requires semantic search over memories — all three namespaces are
 looked up by exact key ([07 §2](07-memory.md)). This drops the requirement to 2 vector
 indexes with zero narrative loss.
 
-### Fallback if the limit is 1
+### Fallback if the limit is 1 *(no longer expected on M10)*
 
 Merge `credit_policies` and `historical_cases` into a single `knowledge` collection with a
 `kind` discriminator (`"policy"` | `"case"`), one vector index, and `kind` as a filter

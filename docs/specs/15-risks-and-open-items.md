@@ -10,8 +10,9 @@
 
 | # | Risk | Impact | Mitigation | Deadline |
 |---|---|---|---|---|
-| 1 | M0 allows fewer search indexes than needed (limit unconfirmed, possibly 3) | Blocks the whole retrieval design | `00_check_atlas.py` probes it first. Two fallbacks already designed in [03 §3](03-atlas-indexes.md) | **Day 1, hour 1** |
-| 2 | M0 vector search latency makes the live demo drag | Demo feels slow in front of the panel | Measure on Day 1. If p95 > 1.5 s: reduce `k`, reduce corpus, or upgrade tier | Day 1 |
+| 1 | ~~M0 search index limit~~ | — | **Closed 2026-08-10.** Cluster is a dedicated **M10** (voucher credits), which does not impose the shared-tier index cap. Still confirmed by `00_check_atlas.py` | closed |
+| 2 | ~~M0 vector search latency~~ | — | **Closed 2026-08-10.** M10 gives dedicated, predictable performance. Still measure p95 on Day 1 and record it | closed |
+| 2b | **IP allowlist blocks the venue network on Friday** | Demo dies at the worst possible moment | The allowlist entry added from home/office will not match the venue IP. Add the venue network on arrival, or temporarily allow `0.0.0.0/0` **only** for the presentation and remove it after. Test connectivity from a phone hotspot on Thursday | **Day 4** |
 | 3 | Venue network fails | Demo dies | Enable Docker Desktop WSL integration and validate the `mongodb/mongodb-atlas-local` compose path as an offline fallback. **Also record a screen capture of a full successful run on Thursday.** | Day 2 / Day 4 |
 | 4 | Docker not currently available in this WSL distro | The "reproduce locally" deliverable ships untested | Enable integration Day 1–2. If not enabled by Wednesday, mark the compose file explicitly as untested in the README rather than implying it works | Day 2 |
 | 5 | Executing model writes pre-2026 APIs (`AsyncMongoDBSaver`, `astream_events(version="v2")`, `filter=` instead of `pre_filter=`) | Hours lost debugging | [13](13-verified-api-contract.md) is authoritative and must be cited in every implementation task | Continuous |
@@ -19,12 +20,14 @@
 | 7 | Voyage free-tier key not obtained in time | Blocks embeddings | The factory already supports OpenAI at the same 1024 dims; switching is one env var plus `--reembed` ([08 §1](08-retrieval.md)) | Day 1 |
 | 8 | Scope overrun on the Next.js frontend | Backend unfinished | Frontend is explicitly cuttable. **The backend must be `curl`-demonstrable by end of Day 2** | Day 2 |
 
-### The two that actually end the project
+### The ones that actually end the project
 
-Risks 1 and 8. Everything else degrades the demo; these two prevent it.
+With risks 1 and 2 closed by the M10 upgrade, the remaining project-enders are **8** (scope
+overrun leaves the backend unfinished) and **2b** (the venue network cannot reach Atlas).
 
-Risk 1 is why `00_check_atlas.py` is the first thing built. Risk 8 is why the degradation
-guarantee in [01 §4](01-architecture.md) is a design constraint rather than a nice idea.
+Risk 8 is why the degradation guarantee in [01 §4](01-architecture.md) is a design
+constraint rather than a nice idea. Risk 2b is the one most likely to be forgotten, because
+it works perfectly every single time you test it at home.
 
 ---
 
@@ -32,12 +35,12 @@ guarantee in [01 §4](01-architecture.md) is a design constraint rather than a n
 
 | Item | Blocks | Resolve by |
 |---|---|---|
-| Atlas M0 cluster provisioned, IP allowlist configured, connection string in `.env` | Everything | **Day 1** |
+| Atlas **M10** cluster provisioned, database user scoped to `credit_assistant`, connection string in `.env` | Everything | **Day 1** |
 | Voyage AI API key obtained | Seeding, all retrieval | **Day 1** |
 | Exact OpenAI chat model id available on the account (goes into `settings.llm_model` and `decisions_log.model`) | All LLM nodes | Day 1 |
-| M0 search index limit confirmed empirically | [03](03-atlas-indexes.md) | Day 1 — via `00_check_atlas.py` |
 | `MongoDBSaver(ttl=...)` behaviour: native TTL index or client-side sweep? | Only the claim made on stage | Day 1 — via `00_check_atlas.py` |
 | Docker Desktop WSL integration enabled | The Docker deliverable, risk 3 fallback | Day 2 |
+| **Venue IP added to the Atlas allowlist** | The live demo | **Day 4 / on arrival** |
 | Confirmed presentation duration | Final demo beat selection | Before Thursday's rehearsal |
 
 Nothing in the build starts before the first two are done.

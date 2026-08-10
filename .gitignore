@@ -1,13 +1,22 @@
 .temp/
+
+# Secrets — deny everything, allow only the template
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
 .venv/
 __pycache__/
 *.pyc
-.env
-.env.local
-node_modules/
-.next/
-dist/
 .pytest_cache/
 .ruff_cache/
 *.egg-info/
+
+node_modules/
+.next/
+dist/
+
 .DS_Store
