@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from langgraph.checkpoint.base import empty_checkpoint
 from langgraph.checkpoint.mongodb import MongoDBSaver
+from pymongo.errors import OperationFailure
 
 from app.config import get_settings
 from app.db import get_client
@@ -156,6 +157,17 @@ def report_checkpoint_ttl_behaviour(client, db_name) -> None:
 
     db["checkpoints"].delete_many({"thread_id": "_atlas_probe_checkpoint"})
     db["checkpoint_writes"].delete_many({"thread_id": "_atlas_probe_checkpoint"})
+
+    # MongoDBSaver(ttl=60) creates a *real* `created_at_1` TTL index on both
+    # collections, not just documents. Left in place, it silently conflicts
+    # with the real checkpointer's ttl=86400 index later (IndexOptionsConflict,
+    # since expireAfterSeconds can't be changed by re-declaring the index) —
+    # hit this exact issue building `app/memory/checkpointer.py` in Session 4.
+    for coll_name in ("checkpoints", "checkpoint_writes"):
+        try:
+            db[coll_name].drop_index("created_at_1")
+        except OperationFailure:
+            pass  # nothing to drop — fine on a fresh cluster
 
 
 def main() -> None:
