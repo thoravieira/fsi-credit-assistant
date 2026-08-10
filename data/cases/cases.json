@@ -1,0 +1,1251 @@
+[
+  {
+    "_id": "CASE-2025-0001",
+    "product": "mortgage",
+    "summary": "Cliente CLT com 7.3 anos de relacionamento com o banco solicitou financiamento imobiliário de R$ 395.000,00. Caso levado ao analista por comprometimento de renda no limite; aprovado com condições após negociação.",
+    "structured": {
+      "requested_amount": 395000,
+      "asset_value": 506410.26,
+      "term_months": 180,
+      "ltv": 0.78,
+      "dti": 0.34,
+      "internal_score": 760,
+      "employment_type": "clt"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "DTI de 34% acima do limite automático, compensado por relacionamento de 88 meses com o banco e score interno de 760. Aprovado em análise manual mediante contratação de seguro MIP e DFI no ato da assinatura.",
+    "decided_by": "ANALYST-CARLOS",
+    "decided_at": "2025-12-28T23:30:11Z",
+    "ltv_band": "high",
+    "final_rate_annual": 0.113,
+    "conditions": [
+      "contratação de seguro MIP e DFI no ato da assinatura"
+    ]
+  },
+  {
+    "_id": "CASE-2025-0002",
+    "product": "mortgage",
+    "summary": "Cliente CLT com 8.5 anos de relacionamento com o banco solicitou financiamento imobiliário de R$ 420.000,00. DTI acima do automático, mas compensado por relacionamento de longa data; aprovado em análise manual com condições.",
+    "structured": {
+      "requested_amount": 420000,
+      "asset_value": 560000.0,
+      "term_months": 180,
+      "ltv": 0.75,
+      "dti": 0.32,
+      "internal_score": 735,
+      "employment_type": "clt"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "DTI de 32% acima do limite automático, compensado por relacionamento de 102 meses com o banco e score interno de 735. Aprovado em análise manual mediante aumento da entrada para 30% do valor do bem.",
+    "decided_by": "ANALYST-CARLOS",
+    "decided_at": "2025-09-02T15:34:41Z",
+    "ltv_band": "mid",
+    "final_rate_annual": 0.113,
+    "conditions": [
+      "aumento da entrada para 30% do valor do bem"
+    ]
+  },
+  {
+    "_id": "CASE-2024-0003",
+    "product": "mortgage",
+    "summary": "Cliente CLT pediu financiamento imobiliário de R$ 448.000,00 com prazo de 420 meses. Caso levado ao analista por comprometimento de renda no limite; aprovado com condições após negociação.",
+    "structured": {
+      "requested_amount": 448000,
+      "asset_value": 560000.0,
+      "term_months": 420,
+      "ltv": 0.8,
+      "dti": 0.33,
+      "internal_score": 748,
+      "employment_type": "clt"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "Proposta fora da faixa automática por DTI de 33%, mas o cliente compartilhou dados via Open Finance evidenciando reserva financeira relevante. Aprovado mediante contratação de seguro MIP e DFI no ato da assinatura.",
+    "decided_by": "ANALYST-RODRIGO",
+    "decided_at": "2024-06-21T14:39:58Z",
+    "ltv_band": "high",
+    "final_rate_annual": 0.113,
+    "conditions": [
+      "contratação de seguro MIP e DFI no ato da assinatura"
+    ]
+  },
+  {
+    "_id": "CASE-2025-0004",
+    "product": "mortgage",
+    "summary": "Solicitação de financiamento imobiliário no valor de R$ 410.000,00 por cliente CLT (Supervisor de logística), score interno 770. Caso levado ao analista por comprometimento de renda no limite; aprovado com condições após negociação.",
+    "structured": {
+      "requested_amount": 410000,
+      "asset_value": 539473.68,
+      "term_months": 240,
+      "ltv": 0.76,
+      "dti": 0.31,
+      "internal_score": 770,
+      "employment_type": "clt"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "DTI de 31% acima do limite automático, compensado por relacionamento de 95 meses com o banco e score interno de 770. Aprovado em análise manual mediante inclusão de avalista com renda comprovada.",
+    "decided_by": "ANALYST-CARLOS",
+    "decided_at": "2025-05-15T21:51:48Z",
+    "ltv_band": "high",
+    "final_rate_annual": 0.113,
+    "conditions": [
+      "inclusão de avalista com renda comprovada"
+    ]
+  },
+  {
+    "_id": "CASE-2024-0005",
+    "product": "mortgage",
+    "summary": "Cliente autônomo pediu financiamento imobiliário de R$ 600.651,00 com prazo de 300 meses. DTI acima do automático, mas compensado por relacionamento de longa data; aprovado em análise manual com condições.",
+    "structured": {
+      "requested_amount": 600651,
+      "asset_value": 790330.26,
+      "term_months": 300,
+      "ltv": 0.76,
+      "dti": 0.321,
+      "internal_score": 628,
+      "employment_type": "autonomo"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "Proposta fora da faixa automática por DTI de 32%, mas o cliente compartilhou dados via Open Finance evidenciando reserva financeira relevante. Aprovado mediante redução do prazo contratado para 240 meses.",
+    "decided_by": "ANALYST-BEATRIZ",
+    "decided_at": "2024-07-22T09:50:42Z",
+    "ltv_band": "high",
+    "final_rate_annual": 0.113,
+    "conditions": [
+      "redução do prazo contratado para 240 meses"
+    ]
+  },
+  {
+    "_id": "CASE-2026-0006",
+    "product": "mortgage",
+    "summary": "Solicitação de financiamento imobiliário no valor de R$ 745.158,00 por cliente CLT (Engenheiro de produção), score interno 763. Proposta simples, aprovada automaticamente pelo sistema.",
+    "structured": {
+      "requested_amount": 745158,
+      "asset_value": 1487341.32,
+      "term_months": 300,
+      "ltv": 0.501,
+      "dti": 0.165,
+      "internal_score": 763,
+      "employment_type": "clt"
+    },
+    "decision": "approved",
+    "rationale": "Score interno de 763 e comprometimento de renda de 16%, ambos dentro da faixa automática para financiamento imobiliário. Nenhuma exceção de política identificada.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2026-01-02T05:20:48Z",
+    "ltv_band": "low",
+    "final_rate_annual": 0.098
+  },
+  {
+    "_id": "CASE-2026-0007",
+    "product": "auto",
+    "summary": "Cliente CLT com 3.4 anos de relacionamento com o banco solicitou financiamento de veículo de R$ 107.240,00. Score interno insuficiente para o risco da operação; recusado.",
+    "structured": {
+      "requested_amount": 107240,
+      "asset_value": 187482.52,
+      "term_months": 36,
+      "ltv": 0.572,
+      "dti": 0.417,
+      "internal_score": 528,
+      "employment_type": "clt"
+    },
+    "decision": "denied",
+    "rationale": "Score interno de 528 insuficiente e ausência de garantia adicional ou avalista inviabilizaram a aprovação, mesmo com LTV de 57% dentro do limite.",
+    "decided_by": "ANALYST-BEATRIZ",
+    "decided_at": "2026-02-06T05:25:46Z",
+    "ltv_band": "low"
+  },
+  {
+    "_id": "CASE-2025-0008",
+    "product": "auto",
+    "summary": "Cliente CLT com 13.2 anos de relacionamento com o banco solicitou financiamento de veículo de R$ 114.166,00. Proposta simples, aprovada automaticamente pelo sistema.",
+    "structured": {
+      "requested_amount": 114166,
+      "asset_value": 146742.93,
+      "term_months": 24,
+      "ltv": 0.778,
+      "dti": 0.236,
+      "internal_score": 841,
+      "employment_type": "clt"
+    },
+    "decision": "approved",
+    "rationale": "Score interno de 841 e comprometimento de renda de 24%, ambos dentro da faixa automática para financiamento de veículo. Nenhuma exceção de política identificada.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2025-11-12T12:00:08Z",
+    "ltv_band": "high",
+    "final_rate_annual": 0.145
+  },
+  {
+    "_id": "CASE-2025-0009",
+    "product": "auto",
+    "summary": "Cliente CLT pediu financiamento de veículo de R$ 124.871,00 com prazo de 36 meses. Proposta simples, aprovada automaticamente pelo sistema.",
+    "structured": {
+      "requested_amount": 124871,
+      "asset_value": 229121.1,
+      "term_months": 36,
+      "ltv": 0.545,
+      "dti": 0.33,
+      "internal_score": 767,
+      "employment_type": "clt"
+    },
+    "decision": "approved",
+    "rationale": "Proposta dentro dos limites automáticos de LTV (55%) e DTI (33%) para financiamento de veículo, com score interno de 767. Aprovação automática pelo sistema.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2025-06-30T07:52:20Z",
+    "ltv_band": "low",
+    "final_rate_annual": 0.145
+  },
+  {
+    "_id": "CASE-2025-0010",
+    "product": "mortgage",
+    "summary": "Solicitação de financiamento imobiliário no valor de R$ 808.038,00 por cliente CLT (Analista financeiro), score interno 735. Comprometimento de renda excessivo, sem fatores compensatórios suficientes; recusado.",
+    "structured": {
+      "requested_amount": 808038,
+      "asset_value": 859614.89,
+      "term_months": 300,
+      "ltv": 0.94,
+      "dti": 0.281,
+      "internal_score": 735,
+      "employment_type": "clt"
+    },
+    "decision": "denied",
+    "rationale": "LTV solicitado de 94% excede o limite máximo de política para financiamento imobiliário. Reprovação automática pelo sistema, sem análise manual.",
+    "decided_by": "ANALYST-CARLOS",
+    "decided_at": "2025-06-15T12:16:14Z",
+    "ltv_band": "high"
+  },
+  {
+    "_id": "CASE-2024-0011",
+    "product": "mortgage",
+    "summary": "Cliente CLT com 5.6 anos de relacionamento com o banco solicitou financiamento imobiliário de R$ 738.582,00. Score interno insuficiente para o risco da operação; recusado.",
+    "structured": {
+      "requested_amount": 738582,
+      "asset_value": 950555.98,
+      "term_months": 240,
+      "ltv": 0.777,
+      "dti": 0.422,
+      "internal_score": 624,
+      "employment_type": "clt"
+    },
+    "decision": "denied",
+    "rationale": "Score interno de 624 insuficiente e ausência de garantia adicional ou avalista inviabilizaram a aprovação, mesmo com LTV de 78% dentro do limite.",
+    "decided_by": "ANALYST-BEATRIZ",
+    "decided_at": "2024-09-08T17:23:25Z",
+    "ltv_band": "high"
+  },
+  {
+    "_id": "CASE-2025-0012",
+    "product": "auto",
+    "summary": "Cliente CLT pediu financiamento de veículo de R$ 118.447,00 com prazo de 48 meses. Proposta simples, aprovada automaticamente pelo sistema.",
+    "structured": {
+      "requested_amount": 118447,
+      "asset_value": 222644.74,
+      "term_months": 48,
+      "ltv": 0.532,
+      "dti": 0.167,
+      "internal_score": 838,
+      "employment_type": "clt"
+    },
+    "decision": "approved",
+    "rationale": "Score interno de 838 e comprometimento de renda de 17%, ambos dentro da faixa automática para financiamento de veículo. Nenhuma exceção de política identificada.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2025-04-06T21:45:19Z",
+    "ltv_band": "low",
+    "final_rate_annual": 0.145
+  },
+  {
+    "_id": "CASE-2024-0013",
+    "product": "mortgage",
+    "summary": "Cliente CLT com 5.8 anos de relacionamento com o banco solicitou financiamento imobiliário de R$ 410.914,00. LTV acima do limite máximo de política; proposta recusada.",
+    "structured": {
+      "requested_amount": 410914,
+      "asset_value": 473949.25,
+      "term_months": 180,
+      "ltv": 0.867,
+      "dti": 0.288,
+      "internal_score": 658,
+      "employment_type": "clt"
+    },
+    "decision": "denied",
+    "rationale": "Score interno de 658 insuficiente e ausência de garantia adicional ou avalista inviabilizaram a aprovação, mesmo com LTV de 87% dentro do limite.",
+    "decided_by": "ANALYST-RODRIGO",
+    "decided_at": "2024-07-26T03:24:25Z",
+    "ltv_band": "high"
+  },
+  {
+    "_id": "CASE-2025-0014",
+    "product": "mortgage",
+    "summary": "Cliente CLT com 1.2 anos de relacionamento com o banco solicitou financiamento imobiliário de R$ 745.427,00. Comprometimento de renda excessivo, sem fatores compensatórios suficientes; recusado.",
+    "structured": {
+      "requested_amount": 745427,
+      "asset_value": 1314686.07,
+      "term_months": 240,
+      "ltv": 0.567,
+      "dti": 0.443,
+      "internal_score": 624,
+      "employment_type": "clt"
+    },
+    "decision": "denied",
+    "rationale": "Score interno de 624 insuficiente e ausência de garantia adicional ou avalista inviabilizaram a aprovação, mesmo com LTV de 57% dentro do limite.",
+    "decided_by": "ANALYST-RODRIGO",
+    "decided_at": "2025-12-14T20:16:08Z",
+    "ltv_band": "low"
+  },
+  {
+    "_id": "CASE-2025-0015",
+    "product": "auto",
+    "summary": "Cliente autônomo com 9.2 anos de relacionamento com o banco solicitou financiamento de veículo de R$ 80.519,00. Caso levado ao analista por comprometimento de renda no limite; aprovado com condições após negociação.",
+    "structured": {
+      "requested_amount": 80519,
+      "asset_value": 119641.9,
+      "term_months": 60,
+      "ltv": 0.673,
+      "dti": 0.314,
+      "internal_score": 730,
+      "employment_type": "autonomo"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "Proposta fora da faixa automática por DTI de 31%, mas o cliente compartilhou dados via Open Finance evidenciando reserva financeira relevante. Aprovado mediante aumento da entrada para 35% do valor do bem.",
+    "decided_by": "ANALYST-RODRIGO",
+    "decided_at": "2025-05-29T17:58:14Z",
+    "ltv_band": "mid",
+    "final_rate_annual": 0.16,
+    "conditions": [
+      "aumento da entrada para 35% do valor do bem"
+    ]
+  },
+  {
+    "_id": "CASE-2025-0016",
+    "product": "mortgage",
+    "summary": "Cliente CLT com 16.0 anos de relacionamento com o banco solicitou financiamento imobiliário de R$ 379.448,00. LTV elevado exigiu análise do analista; aprovado mediante garantia adicional.",
+    "structured": {
+      "requested_amount": 379448,
+      "asset_value": 557192.36,
+      "term_months": 420,
+      "ltv": 0.681,
+      "dti": 0.378,
+      "internal_score": 683,
+      "employment_type": "clt"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "DTI de 38% acima do limite automático, compensado por relacionamento de 192 meses com o banco e score interno de 683. Aprovado em análise manual mediante compartilhamento de dados via Open Finance como garantia complementar.",
+    "decided_by": "ANALYST-BEATRIZ",
+    "decided_at": "2025-05-15T10:45:45Z",
+    "ltv_band": "mid",
+    "final_rate_annual": 0.113,
+    "conditions": [
+      "compartilhamento de dados via Open Finance como garantia complementar"
+    ]
+  },
+  {
+    "_id": "CASE-2026-0017",
+    "product": "auto",
+    "summary": "Solicitação de financiamento de veículo no valor de R$ 31.630,00 por servidor público (Analista do TRT), score interno 760. LTV elevado exigiu análise do analista; aprovado mediante garantia adicional.",
+    "structured": {
+      "requested_amount": 31630,
+      "asset_value": 42513.44,
+      "term_months": 24,
+      "ltv": 0.744,
+      "dti": 0.421,
+      "internal_score": 760,
+      "employment_type": "servidor_publico"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "DTI de 42% acima do limite automático, compensado por relacionamento de 25 meses com o banco e score interno de 760. Aprovado em análise manual mediante contratação de seguro MIP e DFI no ato da assinatura.",
+    "decided_by": "ANALYST-BEATRIZ",
+    "decided_at": "2026-06-23T15:23:58Z",
+    "ltv_band": "mid",
+    "final_rate_annual": 0.16,
+    "conditions": [
+      "contratação de seguro MIP e DFI no ato da assinatura"
+    ]
+  },
+  {
+    "_id": "CASE-2025-0018",
+    "product": "auto",
+    "summary": "Cliente CLT com 9.0 anos de relacionamento com o banco solicitou financiamento de veículo de R$ 59.760,00. Proposta simples, aprovada automaticamente pelo sistema.",
+    "structured": {
+      "requested_amount": 59760,
+      "asset_value": 80975.61,
+      "term_months": 60,
+      "ltv": 0.738,
+      "dti": 0.156,
+      "internal_score": 700,
+      "employment_type": "clt"
+    },
+    "decision": "approved",
+    "rationale": "Score interno de 700 e comprometimento de renda de 16%, ambos dentro da faixa automática para financiamento de veículo. Nenhuma exceção de política identificada.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2025-01-08T13:25:51Z",
+    "ltv_band": "mid",
+    "final_rate_annual": 0.157
+  },
+  {
+    "_id": "CASE-2024-0019",
+    "product": "mortgage",
+    "summary": "Cliente CLT com 5.1 anos de relacionamento com o banco solicitou financiamento imobiliário de R$ 508.838,00. Dentro dos limites automáticos, aprovado sem necessidade de análise manual.",
+    "structured": {
+      "requested_amount": 508838,
+      "asset_value": 759459.7,
+      "term_months": 180,
+      "ltv": 0.67,
+      "dti": 0.218,
+      "internal_score": 838,
+      "employment_type": "clt"
+    },
+    "decision": "approved",
+    "rationale": "Score interno de 838 e comprometimento de renda de 22%, ambos dentro da faixa automática para financiamento imobiliário. Nenhuma exceção de política identificada.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2024-07-09T22:43:15Z",
+    "ltv_band": "mid",
+    "final_rate_annual": 0.098
+  },
+  {
+    "_id": "CASE-2026-0020",
+    "product": "auto",
+    "summary": "Cliente aposentado pediu financiamento de veículo de R$ 77.923,00 com prazo de 24 meses. DTI acima do automático, mas compensado por relacionamento de longa data; aprovado em análise manual com condições.",
+    "structured": {
+      "requested_amount": 77923,
+      "asset_value": 90819.35,
+      "term_months": 24,
+      "ltv": 0.858,
+      "dti": 0.31,
+      "internal_score": 637,
+      "employment_type": "aposentado"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "Proposta fora da faixa automática por DTI de 31%, mas o cliente compartilhou dados via Open Finance evidenciando reserva financeira relevante. Aprovado mediante contratação de seguro MIP e DFI no ato da assinatura.",
+    "decided_by": "ANALYST-RODRIGO",
+    "decided_at": "2026-06-02T08:37:26Z",
+    "ltv_band": "high",
+    "final_rate_annual": 0.16,
+    "conditions": [
+      "contratação de seguro MIP e DFI no ato da assinatura"
+    ]
+  },
+  {
+    "_id": "CASE-2025-0021",
+    "product": "auto",
+    "summary": "Solicitação de financiamento de veículo no valor de R$ 56.285,00 por cliente CLT (Coordenador de vendas), score interno 552. Score interno insuficiente para o risco da operação; recusado.",
+    "structured": {
+      "requested_amount": 56285,
+      "asset_value": 83385.19,
+      "term_months": 48,
+      "ltv": 0.675,
+      "dti": 0.541,
+      "internal_score": 552,
+      "employment_type": "clt"
+    },
+    "decision": "denied",
+    "rationale": "LTV solicitado de 68% excede o limite máximo de política para financiamento de veículo. Reprovação automática pelo sistema, sem análise manual.",
+    "decided_by": "ANALYST-RODRIGO",
+    "decided_at": "2025-04-04T09:58:58Z",
+    "ltv_band": "mid"
+  },
+  {
+    "_id": "CASE-2025-0022",
+    "product": "mortgage",
+    "summary": "Cliente CLT com 16.5 anos de relacionamento com o banco solicitou financiamento imobiliário de R$ 284.837,00. LTV elevado exigiu análise do analista; aprovado mediante garantia adicional.",
+    "structured": {
+      "requested_amount": 284837,
+      "asset_value": 361468.27,
+      "term_months": 180,
+      "ltv": 0.788,
+      "dti": 0.301,
+      "internal_score": 779,
+      "employment_type": "clt"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "LTV de 79% exigiu análise manual para financiamento imobiliário. Score interno de 779 e 198 meses de relacionamento foram considerados fatores compensatórios. Condição: redução do prazo contratado para 120 meses.",
+    "decided_by": "ANALYST-CARLOS",
+    "decided_at": "2025-07-23T14:13:54Z",
+    "ltv_band": "high",
+    "final_rate_annual": 0.113,
+    "conditions": [
+      "redução do prazo contratado para 120 meses"
+    ]
+  },
+  {
+    "_id": "CASE-2025-0023",
+    "product": "auto",
+    "summary": "Servidor público com 8.3 anos de relacionamento com o banco solicitou financiamento de veículo de R$ 64.651,00. Dentro dos limites automáticos, aprovado sem necessidade de análise manual.",
+    "structured": {
+      "requested_amount": 64651,
+      "asset_value": 136682.88,
+      "term_months": 24,
+      "ltv": 0.473,
+      "dti": 0.216,
+      "internal_score": 839,
+      "employment_type": "servidor_publico"
+    },
+    "decision": "approved",
+    "rationale": "Score interno de 839 e comprometimento de renda de 22%, ambos dentro da faixa automática para financiamento de veículo. Nenhuma exceção de política identificada.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2025-11-01T17:52:20Z",
+    "ltv_band": "low",
+    "final_rate_annual": 0.145
+  },
+  {
+    "_id": "CASE-2024-0024",
+    "product": "mortgage",
+    "summary": "Solicitação de financiamento imobiliário no valor de R$ 400.861,00 por cliente CLT (Engenheiro de produção), score interno 772. Proposta simples, aprovada automaticamente pelo sistema.",
+    "structured": {
+      "requested_amount": 400861,
+      "asset_value": 673715.97,
+      "term_months": 300,
+      "ltv": 0.595,
+      "dti": 0.146,
+      "internal_score": 772,
+      "employment_type": "clt"
+    },
+    "decision": "approved",
+    "rationale": "Score interno de 772 e comprometimento de renda de 15%, ambos dentro da faixa automática para financiamento imobiliário. Nenhuma exceção de política identificada.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2024-11-06T03:19:44Z",
+    "ltv_band": "low",
+    "final_rate_annual": 0.098
+  },
+  {
+    "_id": "CASE-2026-0025",
+    "product": "mortgage",
+    "summary": "Solicitação de financiamento imobiliário no valor de R$ 183.717,00 por servidor público (Analista do TRT), score interno 690. Caso levado ao analista por comprometimento de renda no limite; aprovado com condições após negociação.",
+    "structured": {
+      "requested_amount": 183717,
+      "asset_value": 288409.73,
+      "term_months": 300,
+      "ltv": 0.637,
+      "dti": 0.338,
+      "internal_score": 690,
+      "employment_type": "servidor_publico"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "LTV de 64% exigiu análise manual para financiamento imobiliário. Score interno de 690 e 19 meses de relacionamento foram considerados fatores compensatórios. Condição: garantia adicional mediante alienação de bem já quitado.",
+    "decided_by": "ANALYST-CARLOS",
+    "decided_at": "2026-01-20T22:42:15Z",
+    "ltv_band": "mid",
+    "final_rate_annual": 0.113,
+    "conditions": [
+      "garantia adicional mediante alienação de bem já quitado"
+    ]
+  },
+  {
+    "_id": "CASE-2026-0026",
+    "product": "mortgage",
+    "summary": "Solicitação de financiamento imobiliário no valor de R$ 752.092,00 por cliente autônomo (Consultor de TI), score interno 876. Dentro dos limites automáticos, aprovado sem necessidade de análise manual.",
+    "structured": {
+      "requested_amount": 752092,
+      "asset_value": 1405779.44,
+      "term_months": 180,
+      "ltv": 0.535,
+      "dti": 0.139,
+      "internal_score": 876,
+      "employment_type": "autonomo"
+    },
+    "decision": "approved",
+    "rationale": "Score interno de 876 e comprometimento de renda de 14%, ambos dentro da faixa automática para financiamento imobiliário. Nenhuma exceção de política identificada.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2026-03-11T05:58:43Z",
+    "ltv_band": "low",
+    "final_rate_annual": 0.098
+  },
+  {
+    "_id": "CASE-2025-0027",
+    "product": "auto",
+    "summary": "Cliente CLT pediu financiamento de veículo de R$ 52.535,00 com prazo de 36 meses. Proposta simples, aprovada automaticamente pelo sistema.",
+    "structured": {
+      "requested_amount": 52535,
+      "asset_value": 103619.33,
+      "term_months": 36,
+      "ltv": 0.507,
+      "dti": 0.325,
+      "internal_score": 710,
+      "employment_type": "clt"
+    },
+    "decision": "approved",
+    "rationale": "Proposta dentro dos limites automáticos de LTV (51%) e DTI (32%) para financiamento de veículo, com score interno de 710. Aprovação automática pelo sistema.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2025-11-01T00:32:23Z",
+    "ltv_band": "low",
+    "final_rate_annual": 0.157
+  },
+  {
+    "_id": "CASE-2024-0028",
+    "product": "mortgage",
+    "summary": "Solicitação de financiamento imobiliário no valor de R$ 365.652,00 por servidor público (Analista do TRT), score interno 760. Proposta simples, aprovada automaticamente pelo sistema.",
+    "structured": {
+      "requested_amount": 365652,
+      "asset_value": 544935.92,
+      "term_months": 360,
+      "ltv": 0.671,
+      "dti": 0.247,
+      "internal_score": 760,
+      "employment_type": "servidor_publico"
+    },
+    "decision": "approved",
+    "rationale": "Proposta dentro dos limites automáticos de LTV (67%) e DTI (25%) para financiamento imobiliário, com score interno de 760. Aprovação automática pelo sistema.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2024-06-20T06:03:04Z",
+    "ltv_band": "mid",
+    "final_rate_annual": 0.098
+  },
+  {
+    "_id": "CASE-2024-0029",
+    "product": "mortgage",
+    "summary": "Solicitação de financiamento imobiliário no valor de R$ 220.605,00 por servidor público (Professor da rede estadual), score interno 527. Comprometimento de renda excessivo, sem fatores compensatórios suficientes; recusado.",
+    "structured": {
+      "requested_amount": 220605,
+      "asset_value": 359291.53,
+      "term_months": 360,
+      "ltv": 0.614,
+      "dti": 0.52,
+      "internal_score": 527,
+      "employment_type": "servidor_publico"
+    },
+    "decision": "denied",
+    "rationale": "LTV solicitado de 61% excede o limite máximo de política para financiamento imobiliário. Reprovação automática pelo sistema, sem análise manual.",
+    "decided_by": "ANALYST-BEATRIZ",
+    "decided_at": "2024-11-20T18:27:54Z",
+    "ltv_band": "mid"
+  },
+  {
+    "_id": "CASE-2026-0030",
+    "product": "auto",
+    "summary": "Servidor público pediu financiamento de veículo de R$ 61.517,00 com prazo de 24 meses. Proposta simples, aprovada automaticamente pelo sistema.",
+    "structured": {
+      "requested_amount": 61517,
+      "asset_value": 137930.49,
+      "term_months": 24,
+      "ltv": 0.446,
+      "dti": 0.265,
+      "internal_score": 802,
+      "employment_type": "servidor_publico"
+    },
+    "decision": "approved",
+    "rationale": "Score interno de 802 e comprometimento de renda de 26%, ambos dentro da faixa automática para financiamento de veículo. Nenhuma exceção de política identificada.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2026-06-22T00:07:09Z",
+    "ltv_band": "low",
+    "final_rate_annual": 0.145
+  },
+  {
+    "_id": "CASE-2024-0031",
+    "product": "auto",
+    "summary": "Solicitação de financiamento de veículo no valor de R$ 48.405,00 por cliente CLT (Coordenador de vendas), score interno 529. Comprometimento de renda excessivo, sem fatores compensatórios suficientes; recusado.",
+    "structured": {
+      "requested_amount": 48405,
+      "asset_value": 71288.66,
+      "term_months": 48,
+      "ltv": 0.679,
+      "dti": 0.541,
+      "internal_score": 529,
+      "employment_type": "clt"
+    },
+    "decision": "denied",
+    "rationale": "LTV solicitado de 68% excede o limite máximo de política para financiamento de veículo. Reprovação automática pelo sistema, sem análise manual.",
+    "decided_by": "ANALYST-RODRIGO",
+    "decided_at": "2024-06-30T17:09:57Z",
+    "ltv_band": "mid"
+  },
+  {
+    "_id": "CASE-2024-0032",
+    "product": "auto",
+    "summary": "Cliente autônomo com 7.2 anos de relacionamento com o banco solicitou financiamento de veículo de R$ 100.574,00. Proposta simples, aprovada automaticamente pelo sistema.",
+    "structured": {
+      "requested_amount": 100574,
+      "asset_value": 186940.52,
+      "term_months": 36,
+      "ltv": 0.538,
+      "dti": 0.337,
+      "internal_score": 729,
+      "employment_type": "autonomo"
+    },
+    "decision": "approved",
+    "rationale": "Proposta dentro dos limites automáticos de LTV (54%) e DTI (34%) para financiamento de veículo, com score interno de 729. Aprovação automática pelo sistema.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2024-12-15T20:22:18Z",
+    "ltv_band": "low",
+    "final_rate_annual": 0.157
+  },
+  {
+    "_id": "CASE-2026-0033",
+    "product": "auto",
+    "summary": "Cliente CLT com 11.9 anos de relacionamento com o banco solicitou financiamento de veículo de R$ 81.531,00. Caso levado ao analista por comprometimento de renda no limite; aprovado com condições após negociação.",
+    "structured": {
+      "requested_amount": 81531,
+      "asset_value": 100407.64,
+      "term_months": 24,
+      "ltv": 0.812,
+      "dti": 0.432,
+      "internal_score": 670,
+      "employment_type": "clt"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "Proposta fora da faixa automática por DTI de 43%, mas o cliente compartilhou dados via Open Finance evidenciando reserva financeira relevante. Aprovado mediante inclusão de avalista com renda comprovada.",
+    "decided_by": "ANALYST-BEATRIZ",
+    "decided_at": "2026-06-08T00:18:08Z",
+    "ltv_band": "high",
+    "final_rate_annual": 0.16,
+    "conditions": [
+      "inclusão de avalista com renda comprovada"
+    ]
+  },
+  {
+    "_id": "CASE-2025-0034",
+    "product": "auto",
+    "summary": "Cliente autônomo pediu financiamento de veículo de R$ 41.683,00 com prazo de 36 meses. Score interno insuficiente para o risco da operação; recusado.",
+    "structured": {
+      "requested_amount": 41683,
+      "asset_value": 58708.45,
+      "term_months": 36,
+      "ltv": 0.71,
+      "dti": 0.456,
+      "internal_score": 575,
+      "employment_type": "autonomo"
+    },
+    "decision": "denied",
+    "rationale": "Score interno de 575 insuficiente e ausência de garantia adicional ou avalista inviabilizaram a aprovação, mesmo com LTV de 71% dentro do limite.",
+    "decided_by": "ANALYST-BEATRIZ",
+    "decided_at": "2025-04-23T13:41:15Z",
+    "ltv_band": "mid"
+  },
+  {
+    "_id": "CASE-2025-0035",
+    "product": "mortgage",
+    "summary": "Solicitação de financiamento imobiliário no valor de R$ 480.850,00 por servidor público (Professor da rede estadual), score interno 700. Proposta simples, aprovada automaticamente pelo sistema.",
+    "structured": {
+      "requested_amount": 480850,
+      "asset_value": 893773.23,
+      "term_months": 240,
+      "ltv": 0.538,
+      "dti": 0.189,
+      "internal_score": 700,
+      "employment_type": "servidor_publico"
+    },
+    "decision": "approved",
+    "rationale": "Score interno de 700 e comprometimento de renda de 19%, ambos dentro da faixa automática para financiamento imobiliário. Nenhuma exceção de política identificada.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2025-04-30T21:41:45Z",
+    "ltv_band": "low",
+    "final_rate_annual": 0.11
+  },
+  {
+    "_id": "CASE-2025-0036",
+    "product": "mortgage",
+    "summary": "Cliente CLT com 5.0 anos de relacionamento com o banco solicitou financiamento imobiliário de R$ 477.571,00. Dentro dos limites automáticos, aprovado sem necessidade de análise manual.",
+    "structured": {
+      "requested_amount": 477571,
+      "asset_value": 920175.34,
+      "term_months": 420,
+      "ltv": 0.519,
+      "dti": 0.255,
+      "internal_score": 743,
+      "employment_type": "clt"
+    },
+    "decision": "approved",
+    "rationale": "Score interno de 743 e comprometimento de renda de 26%, ambos dentro da faixa automática para financiamento imobiliário. Nenhuma exceção de política identificada.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2025-10-29T15:07:56Z",
+    "ltv_band": "low",
+    "final_rate_annual": 0.11
+  },
+  {
+    "_id": "CASE-2026-0037",
+    "product": "mortgage",
+    "summary": "Solicitação de financiamento imobiliário no valor de R$ 678.216,00 por cliente autônomo (Consultor de TI), score interno 711. Proposta simples, aprovada automaticamente pelo sistema.",
+    "structured": {
+      "requested_amount": 678216,
+      "asset_value": 1101000.0,
+      "term_months": 420,
+      "ltv": 0.616,
+      "dti": 0.145,
+      "internal_score": 711,
+      "employment_type": "autonomo"
+    },
+    "decision": "approved",
+    "rationale": "Proposta dentro dos limites automáticos de LTV (62%) e DTI (14%) para financiamento imobiliário, com score interno de 711. Aprovação automática pelo sistema.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2026-03-23T00:15:31Z",
+    "ltv_band": "mid",
+    "final_rate_annual": 0.11
+  },
+  {
+    "_id": "CASE-2026-0038",
+    "product": "mortgage",
+    "summary": "Servidor público pediu financiamento imobiliário de R$ 185.814,00 com prazo de 180 meses. LTV acima do limite máximo de política; proposta recusada.",
+    "structured": {
+      "requested_amount": 185814,
+      "asset_value": 200230.6,
+      "term_months": 180,
+      "ltv": 0.928,
+      "dti": 0.274,
+      "internal_score": 662,
+      "employment_type": "servidor_publico"
+    },
+    "decision": "denied",
+    "rationale": "DTI de 27% excede o limite máximo absoluto para financiamento imobiliário, representando risco de superendividamento. Reprovado mesmo com score interno de 662.",
+    "decided_by": "ANALYST-CARLOS",
+    "decided_at": "2026-01-26T14:48:29Z",
+    "ltv_band": "high"
+  },
+  {
+    "_id": "CASE-2025-0039",
+    "product": "mortgage",
+    "summary": "Cliente CLT pediu financiamento imobiliário de R$ 319.816,00 com prazo de 360 meses. LTV elevado exigiu análise do analista; aprovado mediante garantia adicional.",
+    "structured": {
+      "requested_amount": 319816,
+      "asset_value": 444188.89,
+      "term_months": 360,
+      "ltv": 0.72,
+      "dti": 0.383,
+      "internal_score": 651,
+      "employment_type": "clt"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "Proposta fora da faixa automática por DTI de 38%, mas o cliente compartilhou dados via Open Finance evidenciando reserva financeira relevante. Aprovado mediante redução do prazo contratado para 300 meses.",
+    "decided_by": "ANALYST-BEATRIZ",
+    "decided_at": "2025-11-01T12:33:03Z",
+    "ltv_band": "mid",
+    "final_rate_annual": 0.113,
+    "conditions": [
+      "redução do prazo contratado para 300 meses"
+    ]
+  },
+  {
+    "_id": "CASE-2025-0040",
+    "product": "auto",
+    "summary": "Servidor público pediu financiamento de veículo de R$ 122.472,00 com prazo de 60 meses. Dentro dos limites automáticos, aprovado sem necessidade de análise manual.",
+    "structured": {
+      "requested_amount": 122472,
+      "asset_value": 229778.61,
+      "term_months": 60,
+      "ltv": 0.533,
+      "dti": 0.32,
+      "internal_score": 814,
+      "employment_type": "servidor_publico"
+    },
+    "decision": "approved",
+    "rationale": "Score interno de 814 e comprometimento de renda de 32%, ambos dentro da faixa automática para financiamento de veículo. Nenhuma exceção de política identificada.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2025-05-16T13:54:30Z",
+    "ltv_band": "low",
+    "final_rate_annual": 0.145
+  },
+  {
+    "_id": "CASE-2025-0041",
+    "product": "auto",
+    "summary": "Cliente CLT com 17.1 anos de relacionamento com o banco solicitou financiamento de veículo de R$ 55.735,00. LTV acima do limite máximo de política; proposta recusada.",
+    "structured": {
+      "requested_amount": 55735,
+      "asset_value": 79621.43,
+      "term_months": 48,
+      "ltv": 0.7,
+      "dti": 0.448,
+      "internal_score": 519,
+      "employment_type": "clt"
+    },
+    "decision": "denied",
+    "rationale": "DTI de 45% excede o limite máximo absoluto para financiamento de veículo, representando risco de superendividamento. Reprovado mesmo com score interno de 519.",
+    "decided_by": "ANALYST-RODRIGO",
+    "decided_at": "2025-02-16T20:39:06Z",
+    "ltv_band": "mid"
+  },
+  {
+    "_id": "CASE-2025-0042",
+    "product": "auto",
+    "summary": "Solicitação de financiamento de veículo no valor de R$ 78.424,00 por cliente CLT (Supervisor de logística), score interno 636. LTV elevado exigiu análise do analista; aprovado mediante garantia adicional.",
+    "structured": {
+      "requested_amount": 78424,
+      "asset_value": 96343.98,
+      "term_months": 48,
+      "ltv": 0.814,
+      "dti": 0.399,
+      "internal_score": 636,
+      "employment_type": "clt"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "DTI de 40% acima do limite automático, compensado por relacionamento de 104 meses com o banco e score interno de 636. Aprovado em análise manual mediante compartilhamento de dados via Open Finance como garantia complementar.",
+    "decided_by": "ANALYST-CARLOS",
+    "decided_at": "2025-07-27T11:00:17Z",
+    "ltv_band": "high",
+    "final_rate_annual": 0.16,
+    "conditions": [
+      "compartilhamento de dados via Open Finance como garantia complementar"
+    ]
+  },
+  {
+    "_id": "CASE-2026-0043",
+    "product": "mortgage",
+    "summary": "Solicitação de financiamento imobiliário no valor de R$ 680.149,00 por servidor público (Professor da rede estadual), score interno 847. Proposta simples, aprovada automaticamente pelo sistema.",
+    "structured": {
+      "requested_amount": 680149,
+      "asset_value": 1027415.41,
+      "term_months": 180,
+      "ltv": 0.662,
+      "dti": 0.123,
+      "internal_score": 847,
+      "employment_type": "servidor_publico"
+    },
+    "decision": "approved",
+    "rationale": "Score interno de 847 e comprometimento de renda de 12%, ambos dentro da faixa automática para financiamento imobiliário. Nenhuma exceção de política identificada.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2026-06-03T05:58:41Z",
+    "ltv_band": "mid",
+    "final_rate_annual": 0.098
+  },
+  {
+    "_id": "CASE-2024-0044",
+    "product": "auto",
+    "summary": "Servidor público com 9.4 anos de relacionamento com o banco solicitou financiamento de veículo de R$ 88.993,00. Proposta simples, aprovada automaticamente pelo sistema.",
+    "structured": {
+      "requested_amount": 88993,
+      "asset_value": 153172.12,
+      "term_months": 36,
+      "ltv": 0.581,
+      "dti": 0.282,
+      "internal_score": 854,
+      "employment_type": "servidor_publico"
+    },
+    "decision": "approved",
+    "rationale": "Score interno de 854 e comprometimento de renda de 28%, ambos dentro da faixa automática para financiamento de veículo. Nenhuma exceção de política identificada.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2024-12-29T23:52:58Z",
+    "ltv_band": "low",
+    "final_rate_annual": 0.145
+  },
+  {
+    "_id": "CASE-2024-0045",
+    "product": "mortgage",
+    "summary": "Cliente CLT pediu financiamento imobiliário de R$ 832.483,00 com prazo de 420 meses. Score interno insuficiente para o risco da operação; recusado.",
+    "structured": {
+      "requested_amount": 832483,
+      "asset_value": 1286681.61,
+      "term_months": 420,
+      "ltv": 0.647,
+      "dti": 0.433,
+      "internal_score": 619,
+      "employment_type": "clt"
+    },
+    "decision": "denied",
+    "rationale": "DTI de 43% excede o limite máximo absoluto para financiamento imobiliário, representando risco de superendividamento. Reprovado mesmo com score interno de 619.",
+    "decided_by": "ANALYST-RODRIGO",
+    "decided_at": "2024-06-21T22:41:27Z",
+    "ltv_band": "mid"
+  },
+  {
+    "_id": "CASE-2025-0046",
+    "product": "mortgage",
+    "summary": "Solicitação de financiamento imobiliário no valor de R$ 452.793,00 por cliente CLT (Analista financeiro), score interno 746. Proposta simples, aprovada automaticamente pelo sistema.",
+    "structured": {
+      "requested_amount": 452793,
+      "asset_value": 922185.34,
+      "term_months": 360,
+      "ltv": 0.491,
+      "dti": 0.267,
+      "internal_score": 746,
+      "employment_type": "clt"
+    },
+    "decision": "approved",
+    "rationale": "Proposta dentro dos limites automáticos de LTV (49%) e DTI (27%) para financiamento imobiliário, com score interno de 746. Aprovação automática pelo sistema.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2025-02-10T06:17:45Z",
+    "ltv_band": "low",
+    "final_rate_annual": 0.11
+  },
+  {
+    "_id": "CASE-2024-0047",
+    "product": "mortgage",
+    "summary": "Cliente CLT pediu financiamento imobiliário de R$ 265.884,00 com prazo de 360 meses. DTI acima do automático, mas compensado por relacionamento de longa data; aprovado em análise manual com condições.",
+    "structured": {
+      "requested_amount": 265884,
+      "asset_value": 396841.79,
+      "term_months": 360,
+      "ltv": 0.67,
+      "dti": 0.386,
+      "internal_score": 727,
+      "employment_type": "clt"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "DTI de 39% acima do limite automático, compensado por relacionamento de 103 meses com o banco e score interno de 727. Aprovado em análise manual mediante redução do prazo contratado para 300 meses.",
+    "decided_by": "ANALYST-BEATRIZ",
+    "decided_at": "2024-06-16T01:19:50Z",
+    "ltv_band": "mid",
+    "final_rate_annual": 0.113,
+    "conditions": [
+      "redução do prazo contratado para 300 meses"
+    ]
+  },
+  {
+    "_id": "CASE-2025-0048",
+    "product": "auto",
+    "summary": "Cliente CLT com 14.3 anos de relacionamento com o banco solicitou financiamento de veículo de R$ 134.999,00. Dentro dos limites automáticos, aprovado sem necessidade de análise manual.",
+    "structured": {
+      "requested_amount": 134999,
+      "asset_value": 367844.69,
+      "term_months": 24,
+      "ltv": 0.367,
+      "dti": 0.127,
+      "internal_score": 763,
+      "employment_type": "clt"
+    },
+    "decision": "approved",
+    "rationale": "Proposta dentro dos limites automáticos de LTV (37%) e DTI (13%) para financiamento de veículo, com score interno de 763. Aprovação automática pelo sistema.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2025-09-26T14:32:10Z",
+    "ltv_band": "low",
+    "final_rate_annual": 0.145
+  },
+  {
+    "_id": "CASE-2026-0049",
+    "product": "auto",
+    "summary": "Solicitação de financiamento de veículo no valor de R$ 46.992,00 por cliente CLT (Coordenador de vendas), score interno 685. DTI acima do automático, mas compensado por relacionamento de longa data; aprovado em análise manual com condições.",
+    "structured": {
+      "requested_amount": 46992,
+      "asset_value": 60401.03,
+      "term_months": 24,
+      "ltv": 0.778,
+      "dti": 0.331,
+      "internal_score": 685,
+      "employment_type": "clt"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "DTI de 33% acima do limite automático, compensado por relacionamento de 35 meses com o banco e score interno de 685. Aprovado em análise manual mediante inclusão de avalista com renda comprovada.",
+    "decided_by": "ANALYST-RODRIGO",
+    "decided_at": "2026-01-26T03:05:29Z",
+    "ltv_band": "high",
+    "final_rate_annual": 0.16,
+    "conditions": [
+      "inclusão de avalista com renda comprovada"
+    ]
+  },
+  {
+    "_id": "CASE-2024-0050",
+    "product": "mortgage",
+    "summary": "Cliente autônomo pediu financiamento imobiliário de R$ 837.711,00 com prazo de 240 meses. DTI acima do automático, mas compensado por relacionamento de longa data; aprovado em análise manual com condições.",
+    "structured": {
+      "requested_amount": 837711,
+      "asset_value": 1212316.93,
+      "term_months": 240,
+      "ltv": 0.691,
+      "dti": 0.364,
+      "internal_score": 639,
+      "employment_type": "autonomo"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "Proposta fora da faixa automática por DTI de 36%, mas o cliente compartilhou dados via Open Finance evidenciando reserva financeira relevante. Aprovado mediante inclusão de avalista com renda comprovada.",
+    "decided_by": "ANALYST-RODRIGO",
+    "decided_at": "2024-08-19T03:34:40Z",
+    "ltv_band": "mid",
+    "final_rate_annual": 0.113,
+    "conditions": [
+      "inclusão de avalista com renda comprovada"
+    ]
+  },
+  {
+    "_id": "CASE-2024-0051",
+    "product": "auto",
+    "summary": "Cliente autônomo pediu financiamento de veículo de R$ 109.874,00 com prazo de 48 meses. LTV elevado exigiu análise do analista; aprovado mediante garantia adicional.",
+    "structured": {
+      "requested_amount": 109874,
+      "asset_value": 142879.06,
+      "term_months": 48,
+      "ltv": 0.769,
+      "dti": 0.393,
+      "internal_score": 637,
+      "employment_type": "autonomo"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "DTI de 39% acima do limite automático, compensado por relacionamento de 94 meses com o banco e score interno de 637. Aprovado em análise manual mediante compartilhamento de dados via Open Finance como garantia complementar.",
+    "decided_by": "ANALYST-BEATRIZ",
+    "decided_at": "2024-06-10T19:51:11Z",
+    "ltv_band": "high",
+    "final_rate_annual": 0.16,
+    "conditions": [
+      "compartilhamento de dados via Open Finance como garantia complementar"
+    ]
+  },
+  {
+    "_id": "CASE-2025-0052",
+    "product": "mortgage",
+    "summary": "Solicitação de financiamento imobiliário no valor de R$ 744.315,00 por servidor público (Auditor fiscal), score interno 569. Score interno insuficiente para o risco da operação; recusado.",
+    "structured": {
+      "requested_amount": 744315,
+      "asset_value": 1136358.78,
+      "term_months": 360,
+      "ltv": 0.655,
+      "dti": 0.513,
+      "internal_score": 569,
+      "employment_type": "servidor_publico"
+    },
+    "decision": "denied",
+    "rationale": "DTI de 51% excede o limite máximo absoluto para financiamento imobiliário, representando risco de superendividamento. Reprovado mesmo com score interno de 569.",
+    "decided_by": "ANALYST-RODRIGO",
+    "decided_at": "2025-05-28T01:52:30Z",
+    "ltv_band": "mid"
+  },
+  {
+    "_id": "CASE-2025-0053",
+    "product": "mortgage",
+    "summary": "Cliente CLT com 5.7 anos de relacionamento com o banco solicitou financiamento imobiliário de R$ 667.282,00. Proposta simples, aprovada automaticamente pelo sistema.",
+    "structured": {
+      "requested_amount": 667282,
+      "asset_value": 1069362.18,
+      "term_months": 420,
+      "ltv": 0.624,
+      "dti": 0.135,
+      "internal_score": 815,
+      "employment_type": "clt"
+    },
+    "decision": "approved",
+    "rationale": "Score interno de 815 e comprometimento de renda de 14%, ambos dentro da faixa automática para financiamento imobiliário. Nenhuma exceção de política identificada.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2025-09-18T01:24:27Z",
+    "ltv_band": "mid",
+    "final_rate_annual": 0.098
+  },
+  {
+    "_id": "CASE-2025-0054",
+    "product": "mortgage",
+    "summary": "Cliente CLT pediu financiamento imobiliário de R$ 473.243,00 com prazo de 420 meses. Dentro dos limites automáticos, aprovado sem necessidade de análise manual.",
+    "structured": {
+      "requested_amount": 473243,
+      "asset_value": 1154251.22,
+      "term_months": 420,
+      "ltv": 0.41,
+      "dti": 0.156,
+      "internal_score": 766,
+      "employment_type": "clt"
+    },
+    "decision": "approved",
+    "rationale": "Score interno de 766 e comprometimento de renda de 16%, ambos dentro da faixa automática para financiamento imobiliário. Nenhuma exceção de política identificada.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2025-11-27T15:00:44Z",
+    "ltv_band": "low",
+    "final_rate_annual": 0.098
+  },
+  {
+    "_id": "CASE-2025-0055",
+    "product": "auto",
+    "summary": "Cliente aposentado com 2.2 anos de relacionamento com o banco solicitou financiamento de veículo de R$ 109.659,00. Comprometimento de renda excessivo, sem fatores compensatórios suficientes; recusado.",
+    "structured": {
+      "requested_amount": 109659,
+      "asset_value": 123629.09,
+      "term_months": 60,
+      "ltv": 0.887,
+      "dti": 0.283,
+      "internal_score": 661,
+      "employment_type": "aposentado"
+    },
+    "decision": "denied",
+    "rationale": "LTV solicitado de 89% excede o limite máximo de política para financiamento de veículo. Reprovação automática pelo sistema, sem análise manual.",
+    "decided_by": "ANALYST-CARLOS",
+    "decided_at": "2025-05-15T02:34:44Z",
+    "ltv_band": "high"
+  },
+  {
+    "_id": "CASE-2025-0056",
+    "product": "auto",
+    "summary": "Solicitação de financiamento de veículo no valor de R$ 94.588,00 por cliente CLT (Engenheiro de produção), score interno 741. Caso levado ao analista por comprometimento de renda no limite; aprovado com condições após negociação.",
+    "structured": {
+      "requested_amount": 94588,
+      "asset_value": 133977.34,
+      "term_months": 48,
+      "ltv": 0.706,
+      "dti": 0.381,
+      "internal_score": 741,
+      "employment_type": "clt"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "LTV de 71% exigiu análise manual para financiamento de veículo. Score interno de 741 e 68 meses de relacionamento foram considerados fatores compensatórios. Condição: redução do prazo contratado para 120 meses.",
+    "decided_by": "ANALYST-BEATRIZ",
+    "decided_at": "2025-04-27T11:57:57Z",
+    "ltv_band": "mid",
+    "final_rate_annual": 0.16,
+    "conditions": [
+      "redução do prazo contratado para 120 meses"
+    ]
+  },
+  {
+    "_id": "CASE-2024-0057",
+    "product": "mortgage",
+    "summary": "Solicitação de financiamento imobiliário no valor de R$ 741.894,00 por cliente CLT (Analista financeiro), score interno 780. Proposta simples, aprovada automaticamente pelo sistema.",
+    "structured": {
+      "requested_amount": 741894,
+      "asset_value": 1741535.21,
+      "term_months": 240,
+      "ltv": 0.426,
+      "dti": 0.243,
+      "internal_score": 780,
+      "employment_type": "clt"
+    },
+    "decision": "approved",
+    "rationale": "Proposta dentro dos limites automáticos de LTV (43%) e DTI (24%) para financiamento imobiliário, com score interno de 780. Aprovação automática pelo sistema.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2024-10-27T18:34:57Z",
+    "ltv_band": "low",
+    "final_rate_annual": 0.098
+  },
+  {
+    "_id": "CASE-2025-0058",
+    "product": "mortgage",
+    "summary": "Cliente autônomo com 16.7 anos de relacionamento com o banco solicitou financiamento imobiliário de R$ 490.636,00. Proposta simples, aprovada automaticamente pelo sistema.",
+    "structured": {
+      "requested_amount": 490636,
+      "asset_value": 938118.55,
+      "term_months": 240,
+      "ltv": 0.523,
+      "dti": 0.168,
+      "internal_score": 725,
+      "employment_type": "autonomo"
+    },
+    "decision": "approved",
+    "rationale": "Proposta dentro dos limites automáticos de LTV (52%) e DTI (17%) para financiamento imobiliário, com score interno de 725. Aprovação automática pelo sistema.",
+    "decided_by": "SYSTEM_AUTO",
+    "decided_at": "2025-03-08T07:18:38Z",
+    "ltv_band": "low",
+    "final_rate_annual": 0.11
+  },
+  {
+    "_id": "CASE-2024-0059",
+    "product": "mortgage",
+    "summary": "Solicitação de financiamento imobiliário no valor de R$ 312.413,00 por cliente autônomo (Designer freelancer), score interno 761. LTV elevado exigiu análise do analista; aprovado mediante garantia adicional.",
+    "structured": {
+      "requested_amount": 312413,
+      "asset_value": 466985.05,
+      "term_months": 360,
+      "ltv": 0.669,
+      "dti": 0.388,
+      "internal_score": 761,
+      "employment_type": "autonomo"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "LTV de 67% exigiu análise manual para financiamento imobiliário. Score interno de 761 e 38 meses de relacionamento foram considerados fatores compensatórios. Condição: redução do prazo contratado para 300 meses.",
+    "decided_by": "ANALYST-BEATRIZ",
+    "decided_at": "2024-08-19T16:22:20Z",
+    "ltv_band": "mid",
+    "final_rate_annual": 0.113,
+    "conditions": [
+      "redução do prazo contratado para 300 meses"
+    ]
+  },
+  {
+    "_id": "CASE-2024-0060",
+    "product": "mortgage",
+    "summary": "Cliente CLT com 1.6 anos de relacionamento com o banco solicitou financiamento imobiliário de R$ 600.172,00. DTI acima do automático, mas compensado por relacionamento de longa data; aprovado em análise manual com condições.",
+    "structured": {
+      "requested_amount": 600172,
+      "asset_value": 902514.29,
+      "term_months": 360,
+      "ltv": 0.665,
+      "dti": 0.378,
+      "internal_score": 649,
+      "employment_type": "clt"
+    },
+    "decision": "approved_with_conditions",
+    "rationale": "Proposta fora da faixa automática por DTI de 38%, mas o cliente compartilhou dados via Open Finance evidenciando reserva financeira relevante. Aprovado mediante garantia adicional mediante alienação de bem já quitado.",
+    "decided_by": "ANALYST-CARLOS",
+    "decided_at": "2024-07-28T12:59:30Z",
+    "ltv_band": "mid",
+    "final_rate_annual": 0.113,
+    "conditions": [
+      "garantia adicional mediante alienação de bem já quitado"
+    ]
+  }
+]

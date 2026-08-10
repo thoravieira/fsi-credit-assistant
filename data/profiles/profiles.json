@@ -1,0 +1,112 @@
+[
+  {
+    "_id": "CUST-0001",
+    "name": "Mariana Duarte",
+    "cpf_masked": "***.456.789-**",
+    "birth_date": "1990-04-17",
+    "employment": {
+      "type": "clt",
+      "employer": "Rede Aurora Varejo",
+      "tenure_months": 74,
+      "occupation": "Gerente de operações"
+    },
+    "income": {
+      "gross_monthly": 14500.0,
+      "net_monthly": 11200.0,
+      "verified": true,
+      "verification_method": "holerite"
+    },
+    "credit": {
+      "internal_score": 782,
+      "bureau_score": 741,
+      "existing_monthly_debt": 1350.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2016-03-01",
+      "tenure_months": 125,
+      "products": ["conta_corrente", "cartao_credito", "seguro_auto"],
+      "avg_balance_12m": 18400.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": [
+        { "institution": "Corretora Meridiano", "type": "cdb", "balance": 96000.0, "liquidity": "d_plus_1" },
+        { "institution": "Corretora Meridiano", "type": "fundo_multimercado", "balance": 42000.0, "liquidity": "d_plus_30" }
+      ]
+    }
+  },
+  {
+    "_id": "CUST-0002",
+    "name": "Rafael Nascimento Souza",
+    "cpf_masked": "***.123.456-**",
+    "birth_date": "1985-09-02",
+    "employment": {
+      "type": "autonomo",
+      "employer": "Estúdio RNS Arquitetura (MEI)",
+      "tenure_months": 96,
+      "occupation": "Arquiteto autônomo"
+    },
+    "income": {
+      "gross_monthly": 18200.0,
+      "net_monthly": 15600.0,
+      "verified": true,
+      "verification_method": "decore"
+    },
+    "credit": {
+      "internal_score": 811,
+      "bureau_score": 795,
+      "existing_monthly_debt": 900.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2019-06-15",
+      "tenure_months": 86,
+      "products": ["conta_corrente", "cartao_credito"],
+      "avg_balance_12m": 32000.0,
+      "salary_portability": false
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": [
+        { "institution": "Banco Alfa Investimentos", "type": "tesouro_direto", "balance": 58000.0, "liquidity": "d_plus_1" }
+      ]
+    }
+  },
+  {
+    "_id": "CUST-0003",
+    "name": "Eliane Cristina Ferreira",
+    "cpf_masked": "***.789.321-**",
+    "birth_date": "1978-12-30",
+    "employment": {
+      "type": "clt",
+      "employer": "Hospital Santa Clara",
+      "tenure_months": 142,
+      "occupation": "Enfermeira coordenadora"
+    },
+    "income": {
+      "gross_monthly": 9800.0,
+      "net_monthly": 7900.0,
+      "verified": true,
+      "verification_method": "holerite"
+    },
+    "credit": {
+      "internal_score": 705,
+      "bureau_score": 688,
+      "existing_monthly_debt": 620.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2011-02-10",
+      "tenure_months": 174,
+      "products": ["conta_corrente", "cartao_credito", "previdencia_privada"],
+      "avg_balance_12m": 9400.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": []
+    }
+  }
+]
