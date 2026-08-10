@@ -18,6 +18,18 @@ places. If your instinct disagrees with file 13, file 13 is right. In particular
 - `MongoDBStore` uses `index_config=create_vector_index_config(...)`, not `index={"embed":...}`.
 - If you call `stream_events`, pass `version="v3"` explicitly.
 
+## Stack — three layers, chosen per problem type
+
+| Layer | Technology | Where |
+|---|---|---|
+| Conversation | LangChain | `intake`, `customer_response`, `analyst_brief` |
+| Workflow | LangGraph | `router` → `decision`, `persist_decision`, `await_approval` |
+| Reasoning | **Deep Agents** (`deepagents==0.7.5`) | `negotiation` only |
+
+`create_deep_agent()` returns a `CompiledStateGraph`. It is used through a **wrapper node**,
+not plugged in directly — `DeepAgentState` and `AgentState` stay separate. The `router` is
+deterministic Python, never an LLM. Contract in `13-verified-api-contract.md` §6b.
+
 ## Rules
 
 - Pinned dependency versions in `13-verified-api-contract.md` §1. Do not bump them this week.

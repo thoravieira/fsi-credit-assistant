@@ -5,12 +5,13 @@ prompt, commit at the end, close the session.
 
 ## Before session 1 — you, not Claude
 
-- [ ] Atlas M0 cluster created, IP allowlist configured
-- [ ] `MONGODB_URI` in hand
-- [ ] Voyage AI API key (free tier)
-- [ ] Exact OpenAI chat model id available on your account
+- [ ] Atlas **M10** cluster created (voucher credits)
+- [ ] Database user scoped `readWrite` on `credit_assistant` — not `atlasAdmin`
+- [ ] Current IP added to the allowlist *(the venue IP on Friday is risk 2b — see SDD 15)*
+- [ ] `cp .env.example .env` and fill in `MONGODB_URI`, `OPENAI_API_KEY`, `LLM_MODEL`,
+      `VOYAGE_API_KEY`
 
-Nothing below runs without these four.
+Nothing below runs without these.
 
 ---
 
@@ -24,8 +25,8 @@ Nothing below runs without these four.
 > Makefile) e implemente `scripts/00_check_atlas.py` conforme a §3 do SDD 03.
 > Não implemente mais nada. Rode o script contra o cluster real e me mostre a saída.
 
-**Gate:** if fewer than 3 vector indexes are allowed, apply the fallback in SDD 03 §3 and
-update SDD 15 before continuing.
+**Gate:** confirm 3 vector indexes coexist and record the measured `$vectorSearch` p95. On
+M10 both are expected to be fine — the point is to assert rather than assume.
 
 ### Session 2 · Dataset + indexes + retrieval eval — **Sonnet**
 
@@ -63,11 +64,14 @@ before touching the graph. If this does not close Monday night, replan Tuesday m
 
 ## Day 3 — analyst flow and UI
 
-### Session 6 · Negotiation agent — **Opus**
+### Session 6 · Negotiation deep agent — **Opus**
 
-> Leia `docs/specs/06-negotiation-agent.md`, `04-graph-state.md` e `10-domain-credit.md`.
-> Implemente `precedent_search`, `analyst_brief`, o nó `negotiation` com as 4 tools,
-> `await_approval` com `interrupt()` e `persist_decision`.
+> Leia `docs/specs/06-negotiation-agent.md`, `04-graph-state.md`, `10-domain-credit.md` e a
+> §6b de `13-verified-api-contract.md`.
+> Implemente `precedent_search`, `analyst_brief`, o nó wrapper `negotiation` usando
+> `create_deep_agent` (2 tools no agente principal + os subagentes `policy_researcher` e
+> `precedent_analyst`), `await_approval` com `interrupt()` e `persist_decision`.
+> **Meça a latência mediana por turno e me reporte** — se passar de 15 s, aplique a §6 da SDD 06.
 
 ### Session 7 · Frontend — **Sonnet**
 
