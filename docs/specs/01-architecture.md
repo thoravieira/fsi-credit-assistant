@@ -21,7 +21,7 @@ flowchart TB
         APPROVE["POST /api/approve"]
     end
 
-    subgraph graph["LangGraph · one thread per application"]
+    subgraph agentgraph["LangGraph · one thread per application"]
         ROUTER[router]
         INTAKE[intake]
         CTX[load_context]
@@ -57,7 +57,7 @@ flowchart TB
     ROUTER --> PREC --> BRIEF
     ROUTER --> NEG --> WAIT --> PERSIST
 
-    graph -.->|read+write every superstep| CKPT
+    agentgraph -.->|read+write every superstep| CKPT
     CTX -.->|read| MEM
     CTX -.->|read| PROF
     POL -.->|$vectorSearch| POLC
