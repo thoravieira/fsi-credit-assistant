@@ -52,6 +52,43 @@ The `state` event is emitted **once, immediately before `done`**, carrying the f
 `stage` / `calc` / `decision` / `pending_approval`. Emitting it per node would make the UI
 flicker through intermediate states that were never real conclusions.
 
+### Two further `trace` statuses, both from the analyst path
+
+`status` is one of `started` · `finished` · **`step`** · **`interrupted`**.
+
+```
+event: trace
+data: {"node":"negotiation","status":"step","step":"policy_researcher","ts":1755180012.4,
+       "detail":{"op":"$vectorSearch","collection":"credit_policies","k":4,
+                 "query":"...","hits":[{"id":"POL-020","score":0.81}]}}
+
+event: trace
+data: {"node":"await_approval","status":"interrupted","ts":1755180031.7}
+```
+
+**`step`** exists because the whole negotiation happens inside *one* graph node. Node
+boundaries alone would render it as a single opaque 7-second `negotiation` step with no
+explanation of what was being waited on — the failure mode [06 §6](06-negotiation-agent.md)
+exists to prevent. A `step` is a tool or subagent announcing itself while it runs, and unlike
+an ordinary `detail` it is flushed **immediately**, not buffered to the node boundary.
+
+**`interrupted`** is `await_approval` calling `interrupt()`. It arrives from `astream` under
+the reserved `__interrupt__` key, whose payload is a *tuple of `Interrupt` objects*, not a
+state update — merging it into the accumulated state raises `TypeError`. It is not a finished
+node: the graph is paused, and the UI should render it as a pending human step until
+`POST /api/approve`.
+
+### Tokens from the negotiation arrive as `custom`, not as `messages`
+
+The negotiation node runs `create_deep_agent`'s `CompiledStateGraph` as a **subgraph**.
+Neither its tokens nor its `get_stream_writer()` events reach the parent's `astream` unless
+the caller passes `subgraphs=True` — which changes the chunk shape and floods the stream with
+the agent's internal `model`/`tools` boundaries. Verified by introspection.
+
+So the wrapper node forwards both through the *parent's* writer, and `/api/chat` maps a
+`custom` payload carrying `token` onto a `token` event. The frontend sees no difference; this
+note exists so nobody later "fixes" the mapper by deleting that branch.
+
 ---
 
 ## 3. How the events are produced
@@ -126,6 +163,10 @@ were real.
 
 - [ ] `curl -N -X POST localhost:8000/api/chat -d '{...}'` streams all four event types.
       This command goes in `docs/demo-script.md` as the frontend fallback.
+- [ ] A negotiation turn streams `token` events *while* the agent writes, and at least one
+      `trace` event with `status: "step"` before the node finishes.
+- [ ] An `__interrupt__` chunk produces `status: "interrupted"` and never reaches the state
+      accumulator.
 - [ ] Node timings in `trace` events are measured, never estimated.
 - [ ] `policy_retrieval` and `precedent_search` emit real matched IDs and scores.
 - [ ] `state` fires exactly once per request, immediately before `done`.

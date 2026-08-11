@@ -7,7 +7,7 @@ silently grows — see SDD 04 §2 for why this is a common LangGraph mistake.
 """
 
 import operator
-from typing import Annotated, Literal, TypedDict
+from typing import Annotated, Literal, NotRequired, TypedDict
 
 from langchain_core.messages import AnyMessage
 from langgraph.graph.message import add_messages
@@ -35,10 +35,29 @@ class CalcResult(TypedDict):
 
 
 class Decision(TypedDict):
-    outcome: Literal["auto_approved", "manual_review", "denied"]
-    reasons: list[str]
+    """Two producers, one field.
+
+    On the customer path `domain/rules.py` writes one of the three automatic
+    outcomes. On the analyst path the human gate writes one of the three
+    human outcomes (SDD 06 §5), merging the agent's proposal with the verdict
+    that arrived through `/api/approve` — which is why the fields only one of
+    them carries are `NotRequired`.
+    """
+
+    outcome: Literal[
+        "auto_approved",
+        "manual_review",
+        "denied",
+        "approved",
+        "approved_with_conditions",
+    ]
     policy_refs: list[str]
-    breached_rules: list[str]
+    reasons: NotRequired[list[str]]
+    breached_rules: NotRequired[list[str]]
+    scenario: NotRequired[dict]
+    rationale: NotRequired[str]
+    precedent_refs: NotRequired[list[str]]
+    conditions: NotRequired[list[str]]
 
 
 class AgentState(TypedDict):

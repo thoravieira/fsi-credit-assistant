@@ -6,6 +6,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _REPO_ROOT_ENV = Path(__file__).resolve().parents[2] / ".env"
 
+# The demo has one analyst and no authentication. A real deployment reads this
+# from the authenticated session; it is a constant here so that every place
+# that stamps an actor or namespaces an analyst memory agrees on one id.
+DEMO_ANALYST_ID = "ANALYST-CARLOS"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=_REPO_ROOT_ENV, extra="ignore")

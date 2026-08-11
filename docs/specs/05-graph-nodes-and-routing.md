@@ -34,8 +34,14 @@ here.
 - **Every retrieval and memory node emits trace detail** via `get_stream_writer()` — see
   [11 §2](11-api-sse.md). The trace panel is only valuable if it is true.
 - **LLM nodes never compute numbers.** They receive `calc` in state and describe it.
-- **`decision` is the only node that writes `applications`.** `persist_decision` is the only
-  node that writes `historical_cases`.
+- **`decision` and `persist_decision` are the only nodes that write `applications`**, and
+  `persist_decision` is the only node that writes `historical_cases`.
+
+> An earlier draft of this file gave `applications` a single writer. That is unimplementable:
+> [02 §5](02-data-model.md) lists `approved` and `approved_with_conditions` among the valid
+> `status` values, and only the analyst path can produce them. With one writer, Carlos's queue
+> would never clear. `decision` owns the automatic outcomes, `persist_decision` owns the
+> post-approval ones, and nothing else touches the collection.
 
 ### `persist_decision` writes three things
 

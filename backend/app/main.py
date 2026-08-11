@@ -220,12 +220,41 @@ async def stream_chat_events(
         payload, config=config, stream_mode=["updates", "messages", "custom"]
     ):
         if mode == "custom":
-            pending_detail.update(chunk)
+            # The negotiation node runs a nested graph, whose tokens and stream
+            # writes do not reach this `astream` on their own. It forwards both
+            # through the parent's writer, so they arrive here as `custom`:
+            #
+            #   `token` — a piece of the agent's answer, relayed as it is written;
+            #   `step`  — a tool or subagent announcing itself mid-node.
+            #
+            # Both are flushed immediately. Buffering them to the node boundary
+            # like an ordinary `detail` would leave the screen blank for the
+            # whole negotiation and then print everything at once, which is the
+            # failure mode SDD 06 §6 exists to prevent.
+            if "token" in chunk:
+                yield _sse("token", {"text": chunk["token"]})
+            elif "step" in chunk:
+                yield _sse("trace", {"status": "step", "ts": time.time(), **chunk})
+            else:
+                pending_detail.update(chunk)
         elif mode == "updates":
             for node, update in chunk.items():
                 now = time.perf_counter()
                 ms = int((now - t_prev) * 1000)
                 t_prev = now
+
+                # `await_approval` calling `interrupt()` arrives under the
+                # reserved `__interrupt__` key, and its payload is a tuple of
+                # `Interrupt` objects rather than a state update. It is a
+                # third status, not a finished node: the graph is paused and
+                # waiting for `POST /api/approve`, which is exactly what the
+                # trace panel should show (SDD 06 §5).
+                if node == "__interrupt__":
+                    yield _sse(
+                        "trace",
+                        {"node": "await_approval", "status": "interrupted", "ts": time.time()},
+                    )
+                    continue
 
                 yield _sse("trace", {"node": node, "status": "started", "ts": time.time() - ms / 1000})
                 event = {"node": node, "status": "finished", "ms": ms}

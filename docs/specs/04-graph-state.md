@@ -57,10 +57,16 @@ class CalcResult(TypedDict):
 
 
 class Decision(TypedDict):
-    outcome: Literal["auto_approved", "manual_review", "denied"]
-    reasons: list[str]
+    """Two producers, one field — see the note below."""
+    outcome: Literal["auto_approved", "manual_review", "denied",      # domain/rules.py
+                     "approved", "approved_with_conditions"]          # the human gate
     policy_refs: list[str]
-    breached_rules: list[str]
+    reasons: NotRequired[list[str]]
+    breached_rules: NotRequired[list[str]]
+    scenario: NotRequired[dict]
+    rationale: NotRequired[str]
+    precedent_refs: NotRequired[list[str]]
+    conditions: NotRequired[list[str]]
 
 
 class AgentState(TypedDict):
@@ -77,6 +83,17 @@ class AgentState(TypedDict):
     scenarios: Annotated[list[dict], operator.add]
     pending_approval: dict | None
 ```
+
+### Why `Decision` has two outcome families
+
+On the customer path `domain/rules.py` writes one of the three automatic outcomes. On the
+analyst path `await_approval` writes the human's ruling merged with the agent's proposal
+([06 §5](06-negotiation-agent.md)), and [02 §5](02-data-model.md) already lists `approved` and
+`approved_with_conditions` as valid application statuses. One field, two producers, so the
+keys only one of them carries are `NotRequired`.
+
+`domain/rules.py` keeps its own strict three-outcome mirror of this TypedDict — it must not
+import from `graph.state`, which pulls in `langchain_core`.
 
 ### Why `scenarios` uses `operator.add`
 

@@ -43,19 +43,34 @@ negotiation_agent = create_deep_agent(
     tools=[recalculate_scenario, check_open_finance_assets],
     system_prompt=load_prompt("negotiation"),
     subagents=[POLICY_RESEARCHER, PRECEDENT_ANALYST],
+    context_schema=NegotiationCase,
     store=store,
     name="negotiation",
 )
 
 
-def negotiation_node(state: AgentState, config) -> dict:
+def negotiation(state: AgentState, config: RunnableConfig) -> dict:
     """Wrapper: project AgentState in, map the deep agent's result back out."""
-    result = negotiation_agent.invoke(
-        {"messages": build_agent_messages(state)},
-        config=config,          # inherits thread_id → nested checkpoints in Atlas
+    case = NegotiationCase(
+        application=state.get("application") or {},
+        profile=state.get("profile") or {},
+        emit=get_stream_writer(),      # the *parent* graph's writer — see below
     )
-    return map_agent_result(state, result)
+    result = _stream_agent(case, _agent_messages(state), config)
+    return _map_result(state, result, case)
 ```
+
+**No `checkpointer=`.** The nested run inherits the parent's through `config`, which is what
+puts its checkpoints on the parent thread — verified: they land under
+`checkpoint_ns="negotiation:<task>"` with the parent `thread_id`, a fresh namespace per turn.
+Passing one explicitly would give the deep agent a checkpoint life of its own.
+
+**`.stream()`, not `.invoke()`.** A subgraph's tokens do not reach the parent's `astream`
+([11 §2](11-api-sse.md)), so `.invoke()` would leave the analyst watching a blank screen for
+seven seconds and then deliver the whole answer at once. The wrapper streams the agent and
+forwards its prose through the parent's writer. No filtering is needed to exclude the
+subagents: their tokens never surface at this level at all, because each runs as its own
+nested graph inside the `task` tool. That is context isolation being observable.
 
 **Why a wrapper and not a direct subgraph node.** `DeepAgentState` carries `messages`,
 `todos` and `files`; `AgentState` carries `calc`, `scenarios`, `decision`, `policies`.
@@ -73,10 +88,32 @@ namespace — which is a nice thing to point at during the architecture walkthro
 **Main agent tools** — the things it does itself:
 
 ```python
-recalculate_scenario(amount: float, term_months: int,
-                     down_payment: float, annual_rate: float | None) -> CalcResult
-check_open_finance_assets(customer_id: str) -> OpenFinanceAssets
+recalculate_scenario(down_payment: float | None = None, term_months: int | None = None,
+                     amount: float | None = None, annual_rate: float | None = None) -> dict
+check_open_finance_assets() -> OpenFinanceAssets
 ```
+
+Both read the case — application, profile, and the parent's stream writer — from a
+`NegotiationCase` passed as LangGraph runtime **context**, injected via `ToolRuntime` and
+stripped from the schema the model sees. Hence the signatures above:
+
+- **Every parameter of `recalculate_scenario` is optional and patches the current
+  application**, mirroring how `intake` treats a re-simulation ([05 §3](05-graph-nodes-and-routing.md)).
+  A turn is usually one lever — *"e se o prazo fosse 420 meses?"* — and a tool demanding all
+  four arguments invites the model to restate the other three from memory. Restating is where
+  invented numbers come from. `down_payment` wins over `amount` when both arrive: the asset
+  value is a fact about the property, the financed amount is its complement.
+- **`check_open_finance_assets` takes no `customer_id`.** There is exactly one customer in a
+  negotiation and they arrive in context, so the model gets no opportunity to name someone
+  else's account. It is also **read-only**: it reports consent, it does not grant it. An agent
+  that silently flipped `consent_granted` on a customer's behalf is the first thing a bank's
+  risk team would ask about. What it unlocks is an *argument*, which is the demo beat anyway.
+
+`recalculate_scenario` returns `inputs`, the full-precision `calc`, the `domain/rules.py`
+`outcome` and `policy_refs` — and a **`resumo`** of pre-formatted Portuguese strings. The
+prompt requires quoting `resumo`, because a model handed `0.2889345588` faithfully writes
+`0.2889345588`: correct, and unusable on a projector. Formatting is not an instruction the
+model may follow; it is a string it can only copy.
 
 **Subagents** — research delegated to isolated context windows:
 
@@ -144,9 +181,22 @@ The main system prompt must:
 from langgraph.types import interrupt
 
 def await_approval(state: AgentState) -> dict:
-    decision = interrupt(state["pending_approval"])
-    return {"pending_approval": None, "decision": decision}
+    proposal = state["pending_approval"]
+    verdict = interrupt(proposal)
+    return {"pending_approval": None, "decision": {**proposal, **verdict}}
 ```
+
+The two are **merged**, not replaced. The proposal carries what the agent argued — the
+scenario, the citations, the rationale; the verdict carries what the human ruled. Keeping only
+the verdict would leave `persist_decision` unable to write a complete record, and the case
+where the two differ is exactly the one an auditor cares about.
+
+`pending_approval` is assembled by the wrapper from data the system already holds, and the
+analyst's verdict is detected by keyword rather than by a classifier call — see
+`app/agent/proposal.py`. That trade-off is deliberate and stated in that module: it costs no
+latency, it cannot hallucinate, and it fails safe, since an unrecognised phrase simply
+continues the negotiation. Nothing is written until a human confirms, so the cost of a miss is
+one more message.
 
 `deepagents` also offers `interrupt_on={"tool_name": True}` for per-tool human-in-the-loop.
 **We deliberately do not use it here**: the approval gate belongs to the parent graph, where
@@ -183,6 +233,32 @@ latency is unacceptable, flip the flag rather than rewrite the node.
 Build the deep path first — it is the one you want to present. Add the flag only if
 Wednesday's numbers demand it.
 
+### Measured — 2026-08-11, `gpt-5.6-luna`, M10, home network
+
+`scripts/04_measure_negotiation.py` drives `stream_chat_events` itself, so what it times is
+the path `/api/chat` runs. Four runs of the full beat-6 sequence (six analyst turns each):
+
+| Run | Median turn | Median turn *with a tool call* | Worst turn | Median first token |
+|---|---|---|---|---|
+| 1 | 5.0 s | 7.2 s | 8.4 s | 6.1 s |
+| 2 | 10.4 s | 12.0 s | 20.4 s | 10.8 s |
+| 3 | 6.0 s | 7.0 s | 7.5 s | 5.8 s |
+| 4 | 4.8 s | 7.4 s | 10.4 s | 5.7 s |
+
+**Median 4.8–10.4 s, comfortably inside the 15 s budget. §6 is not applied and
+`AGENT_MODE` is not built.** Run 2's 20.4 s outlier was a single turn with one tool call —
+provider variance, not a code path. Re-run the script on Wednesday and on Friday morning: the
+numbers move with the model and with the venue's network, and the fallback is a decision to
+make on evidence.
+
+The mitigation that *is* in place is the first one. Tokens stream, and subagent delegation
+shows as `trace` steps ([11 §2](11-api-sse.md)) — first token lands at ~6 s while the turn
+completes at ~7 s, so the wait is watched rather than blank.
+
+> ⚠️ `LLM_MODEL` is a reasoning model, and Chat Completions **rejects function tools while
+> reasoning is on**. `app/llm.py` pins `reasoning_effort="none"`; without it every tool call
+> in this file fails with a 400. See [13](13-verified-api-contract.md).
+
 ---
 
 ## 7. Scenario levers for the demo
@@ -217,4 +293,6 @@ to "yes" for a *business* reason rather than a numeric one.
       including rejected ones.
 - [ ] Saying "aprovar" sets `pending_approval`, reaches `await_approval`, and writes no
       final decision until `/api/approve` is called.
-- [ ] **Median turn latency measured and recorded on Wednesday.** If > 15 s, apply §6.
+- [x] **Median turn latency measured and recorded** — §6, four runs, median 4.8–10.4 s.
+      Re-run `scripts/04_measure_negotiation.py` on Wednesday and Friday morning; if the
+      median passes 15 s, apply §6.

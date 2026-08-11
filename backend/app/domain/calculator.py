@@ -112,3 +112,60 @@ def schedule_preview(pv: float, monthly_rate: float, n: int) -> list[dict]:
             }
         )
     return rows[:2] + rows[-1:]
+
+
+# Illustrative transaction-cost assumptions feeding `cet_annual`. Not policy
+# thresholds, so not subject to the policy/code consistency invariant of
+# SDD 10 §4.
+MONTHLY_INSURANCE_RATE = 0.00025  # MIP/DFI, % of financed amount per month
+APPRAISAL_FEE = 2_500.0
+IOF_RATE = 0.0038
+
+
+def compute_scenario(
+    *,
+    product: Product,
+    asset_value: float,
+    financed: float,
+    term_months: int,
+    net_income: float,
+    existing_debt: float = 0.0,
+    score: int = 650,
+    rate: float | None = None,
+) -> dict:
+    """One credit structure, fully evaluated. Returns the `CalcResult` shape of
+    SDD 04 §2 as a plain dict — `domain/` imports neither `langchain*` nor
+    `langgraph*`, so it cannot name the TypedDict.
+
+    Both paths through the system call this and nothing else: the
+    `credit_calculator` node on Mariana's side, and the `recalculate_scenario`
+    tool on Carlos's. That is deliberate. If the analyst's re-simulation used
+    a second implementation, the two screens could disagree by a few reais on
+    stage and there would be no good answer for why.
+
+    `rate=None` means "apply the tabled rate for this LTV and score". Passing a
+    rate is the analyst exercising their authority (alçada), which is one of
+    the negotiation levers in SDD 06 §7.
+    """
+    ltv_value = ltv(financed, asset_value)
+    annual = annual_rate(product, ltv_value, score) if rate is None else rate
+    monthly_rate = effective_monthly_rate(annual)
+
+    monthly_payment = pmt(financed, monthly_rate, term_months)
+
+    return {
+        "monthly_payment": monthly_payment,
+        "total_interest": monthly_payment * term_months - financed,
+        "annual_rate": annual,
+        "cet_annual": cet_annual(
+            principal=financed,
+            monthly_payment=monthly_payment,
+            n=term_months,
+            monthly_insurance=financed * MONTHLY_INSURANCE_RATE,
+            appraisal_fee=APPRAISAL_FEE,
+            iof=financed * IOF_RATE,
+        ),
+        "ltv": ltv_value,
+        "dti": dti(monthly_payment, net_income, existing_debt),
+        "schedule_preview": schedule_preview(financed, monthly_rate, term_months),
+    }

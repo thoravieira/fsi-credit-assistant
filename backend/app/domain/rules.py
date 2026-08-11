@@ -12,6 +12,12 @@ from dataclasses import dataclass, fields
 from datetime import date, datetime
 from typing import Any, Literal, Mapping, TypedDict
 
+# Brazilian formatting: comma decimal separator, dot thousands separator. These
+# strings are read on screen by Mariana and Carlos, and
+# `tests/test_policy_consistency.py` asserts that a rendered threshold matches
+# the wording of the policy document `rules.py` cites for it.
+from app.domain.formatting import brl as _brl, percent as _pct, years as _years
+
 Product = Literal["mortgage", "auto"]
 Outcome = Literal["auto_approved", "manual_review", "denied"]
 
@@ -125,32 +131,6 @@ POLICIES: dict[Product, ProductPolicy] = {
 def product_thresholds(policy: ProductPolicy) -> tuple[Threshold, ...]:
     """Every threshold on a `ProductPolicy`, in declaration order."""
     return tuple(getattr(policy, field.name) for field in fields(policy))
-
-
-# --- Portuguese formatting -------------------------------------------------
-# These strings are read on screen by Mariana and Carlos, so they follow
-# Brazilian conventions: comma decimal separator, dot thousands separator.
-
-
-def _pct(value: float) -> str:
-    """`0.70 -> "70%"`, `0.7512 -> "75,1%"`. Round limits drop the decimal so a
-    threshold renders exactly as the policy corpus writes it (SDD 10 §4).
-    """
-    percent = value * 100
-    if round(percent, 1).is_integer():
-        return f"{round(percent)}%"
-    return f"{percent:.1f}".replace(".", ",") + "%"
-
-
-def _brl(value: float) -> str:
-    integer, _, cents = f"{value:.2f}".partition(".")
-    grouped = f"{int(integer):,}".replace(",", ".")
-    return f"R$ {grouped},{cents}"
-
-
-def _years(value: float) -> str:
-    text = f"{value:g}" if float(value).is_integer() else f"{value:.1f}".replace(".", ",")
-    return f"{text} anos"
 
 
 def render_threshold(threshold: Threshold) -> str:

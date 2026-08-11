@@ -45,6 +45,13 @@ provider-agnostic. `text-embedding-3-small` truncates via `dimensions`; `voyage-
 **Cases:** the `summary` field — a narrative paragraph, never a serialisation of the
 structured fields.
 
+> ⚠️ The two collections therefore need **different** `text_key`s.
+> `MongoDBAtlasVectorSearch` defaults to `text_key="text"`, which is right for
+> `credit_policies` and wrong for `historical_cases`: the default returns hits whose
+> `page_content` is empty. That is invisible to an id-based recall metric — the eval in
+> [09](09-retrieval-eval.md) passed with it — and very visible the moment a precedent is
+> displayed. `retrieval/precedents.py` passes `text_key="summary"`.
+
 This is a deliberate technical position, worth articulating out loud.
 
 Cosine similarity between `{"ltv": 0.80}` and `{"ltv": 0.75}` is noise. Numeric fields carry

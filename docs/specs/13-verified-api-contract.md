@@ -288,6 +288,34 @@ Available middleware (`deepagents.middleware`): `SubAgentMiddleware`, `Filesyste
 > `subagents` takes **plain dicts** matching the `SubAgent` TypedDict — do not look for a
 > `SubAgent(...)` constructor.
 
+### 6c. Behaviour verified by running it, not by reading about it
+
+Four facts about composing a deep agent into a parent graph. All were measured on
+**2026-08-11** against the installed packages; none is documented anywhere convenient.
+
+| Question | Answer |
+|---|---|
+| Do nested checkpoints land on the parent thread? | **Yes.** Invoke with the parent `config` and no `checkpointer=`; writes appear under `checkpoint_ns="<name>:<task-id>"` with the parent `thread_id`. The namespace is fresh per parent turn, so the agent's `messages` do not accumulate across turns. |
+| Does `get_stream_writer()` inside the nested graph reach the parent's `astream`? | **No** — not without `subgraphs=True`. Capture the parent's writer in the wrapper node and hand it to the tools instead. |
+| Does `context=` reach the tools, including a **subagent's** tools? | **Yes**, both. `ToolRuntime[T]` is injected and **stripped from the model-facing JSON schema** — confirmed via `tool.args`. |
+| Do the nested agent's LLM tokens reach the parent's `astream`? | **No.** Stream the agent inside the wrapper and forward. A *subagent's* tokens do not even surface at the main agent's own stream level — they appear only as the `task` tool's result. |
+
+> ⚠️ **`reasoning_effort` and function tools are mutually exclusive on Chat Completions.**
+> With `LLM_MODEL=gpt-5.6-luna`, binding any tool returns a 400:
+>
+> ```
+> Function tools with reasoning_effort are not supported for gpt-5.6-luna in
+> /v1/chat/completions. To use function tools, use /v1/responses or set
+> reasoning_effort to 'none'.
+> ```
+>
+> `app/llm.py` pins `reasoning_effort="none"`. The Responses API
+> (`ChatOpenAI(use_responses_api=True)`) would allow both, at a latency cost the 15 s budget
+> in [06 §6](06-negotiation-agent.md) has no room for.
+>
+> This bites tool-calling nodes only. `with_structured_output` uses a JSON-schema response
+> format rather than function tools, which is why `intake` worked from session 4.
+
 ---
 
 ## 7. Low-level index creation (reference only)
@@ -323,3 +351,6 @@ collection.create_search_index(
 | `similarity_search(..., filter=...)` | It is `pre_filter=`. |
 | `astream_events(..., version="v2")` | Default, but v3 is current. Pass it explicitly or use `astream`. |
 | Motor as the async MongoDB driver | EOL 2026-05-14. PyMongo's native `AsyncMongoClient` is the path. |
+| `ChatOpenAI(model=<reasoning model>).bind_tools(...)` | 400 unless `reasoning_effort="none"`. See §6c. |
+| A nested agent's tokens / custom events reach the parent stream | They do not. Forward them from the wrapper. See §6c. |
+| `MongoDBAtlasVectorSearch(...)` defaults to the right `text_key` | It defaults to `"text"`. `historical_cases` stores prose in `summary`, so it needs `text_key="summary"` or every hit comes back with empty `page_content`. |

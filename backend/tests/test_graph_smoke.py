@@ -20,12 +20,20 @@ from langchain_core.language_models.fake_chat_models import FakeListChatModel
 from langchain_core.messages import HumanMessage
 
 from app.db import get_db
-from app.graph.builder import ANALYST_PATH_PENDING, build_graph
+from app.graph.builder import build_graph
 from app.graph.nodes.intake import _ExtractedFields
 from app.memory.checkpointer import get_checkpointer
 from app.memory.store import get_store
 
-NODES_DIR = Path(__file__).resolve().parents[1] / "app" / "graph" / "nodes"
+APP_DIR = Path(__file__).resolve().parents[1] / "app"
+# `negotiation` is a node too, and it lives outside `nodes/` (SDD 06 §2), so the
+# invariant has to look there as well or the one node most likely to reach for
+# `stage` is the one node the check misses.
+NODE_MODULES = sorted(
+    path
+    for path in [*(APP_DIR / "graph" / "nodes").glob("*.py"), APP_DIR / "agent" / "negotiation.py"]
+    if path.stem != "__init__"
+)
 
 # SDD 04 §3 — exhaustive. Any node not listed here must not write `stage`.
 ALLOWED_STAGE_WRITERS = {"intake", "decision", "analyst_brief", "persist_decision"}
@@ -45,9 +53,8 @@ def _returns_stage_key(path: Path) -> bool:
 def test_only_allowed_nodes_mention_stage():
     offenders = [
         path.stem
-        for path in NODES_DIR.glob("*.py")
-        if path.stem != "__init__" and path.stem not in ALLOWED_STAGE_WRITERS
-        and _returns_stage_key(path)
+        for path in NODE_MODULES
+        if path.stem not in ALLOWED_STAGE_WRITERS and _returns_stage_key(path)
     ]
     assert offenders == []
 
@@ -178,39 +185,11 @@ def test_incomplete_intake_asks_instead_of_calculating(graph, thread):
     assert get_db()["decisions_log"].count_documents({"application_id": thread}) == 0
 
 
-def test_analyst_entry_reaches_the_pending_node(graph, thread):
-    """SDD 05 §3 — an analyst turn at `stage="review"` routes to
-    `precedent_search`. That node is session 6; until then the branch resolves
-    to `_analyst_path_pending`, which says so instead of failing obscurely.
-    """
-    config = {"configurable": {"thread_id": thread}}
-    payload = {
-        "persona": "analyst",
-        "stage": "review",
-        "messages": [HumanMessage("qual o histórico deste caso?")],
-    }
-
-    with pytest.raises(NotImplementedError, match="session 6"):
-        graph.invoke(payload, config=config)
-
-
-def test_negotiation_branch_also_reaches_the_pending_node(graph, thread):
-    config = {"configurable": {"thread_id": thread}}
-    payload = {
-        "persona": "analyst",
-        "stage": "negotiation",
-        "messages": [HumanMessage("e se a entrada subir?")],
-    }
-
-    with pytest.raises(NotImplementedError, match="session 6"):
-        graph.invoke(payload, config=config)
-
-
-def test_pending_node_is_the_only_placeholder(graph):
-    """When session 6 lands, this list is what it replaces."""
+def test_all_twelve_nodes_are_wired(graph):
+    """SDD 05 §1 — the node list, complete. Both personas, no placeholders."""
     nodes = set(graph.get_graph().nodes) - {"__start__", "__end__"}
-    assert ANALYST_PATH_PENDING in nodes
     assert nodes == {
+        # customer path
         "router",
         "intake",
         "load_context",
@@ -218,7 +197,12 @@ def test_pending_node_is_the_only_placeholder(graph):
         "credit_calculator",
         "decision",
         "customer_response",
-        ANALYST_PATH_PENDING,
+        # analyst path
+        "precedent_search",
+        "analyst_brief",
+        "negotiation",
+        "await_approval",
+        "persist_decision",
     }
 
 
