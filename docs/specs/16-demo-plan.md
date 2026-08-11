@@ -30,8 +30,8 @@ Modular by design — each beat is skippable live if time runs short.
 |---|---|---|---|
 | 1 | **Discovery.** Ask the "customer" about their origination pain before showing anything. Do not open a browser yet. | 5–8 | ✅ |
 | 2 | Business framing: friction on both sides, cost of manual review | 3 | ✅ |
-| 3 | Mariana simulates → auto-approved. Trace panel visible. | 4 | ✅ |
-| 4 | Mariana simulates a larger amount → falls to manual review. Show the `applications` status change. | 3 | ✅ |
+| 3 | Mariana simulates → auto-approved. Imóvel R$ 400 mil, entrada R$ 180 mil, 360 meses. Trace panel visible. | 4 | ✅ |
+| 4 | Mariana drops the entrada to R$ 100 mil → falls to manual review. Show the `applications` status change. | 3 | ✅ |
 | 5 | Carlos opens the case. Brief with recommendation + policy citations + precedents. **Say the words "same thread ID".** | 5 | ✅ |
 | 6 | Negotiation: 3 scenarios — reduce amount → extend term → Open Finance consent. `ScenarioTable` accumulates. | 8 | ✅ |
 | 7 | **Kill the backend mid-negotiation. Restart. Continue.** | 2 | ✅ |
@@ -48,6 +48,34 @@ Most technically strong candidates skip discovery and go straight to the screen.
 explicitly scored criterion. Prepare four questions to ask the "customer" — about volume of
 manual reviews, average turnaround, what analysts complain about, what happens when a case
 is declined — and *actually listen*, then reference their answers during the demo.
+
+### The beat 3 / beat 4 figures are load-bearing — do not round them
+
+Both run against **CUST-0001** (Mariana Duarte: renda líquida R$ 11.200, dívida mensal
+existente R$ 1.350, score interno 782), and the outcome of each is arithmetic, not
+narrative. Verified against the seeded profile:
+
+| | Beat 3 | Beat 4 |
+|---|---|---|
+| Imóvel / entrada | R$ 400.000 / R$ 180.000 | R$ 400.000 / R$ 100.000 |
+| Financiado | R$ 220.000 | R$ 300.000 |
+| LTV · DTI | 55% · 28,4% | 75% · 35,8% |
+| Parcela · taxa · CET | R$ 1.831,54 · 9,8% · 10,37% | R$ 2.658,78 · 10,6% · 11,13% |
+| Outcome | `auto_approved` | `manual_review` |
+| Citations | POL-020, POL-004, POL-008, POL-012, POL-006 | POL-020, POL-004 |
+
+**Beat 4 changes the entrada, not the asset.** Same imóvel on the same thread, so it
+exercises the re-simulation path — `intake` patches `down_payment` on the prior application
+and the financed amount, LTV and decision all move with it. That is the *"e se eu desse mais
+entrada?"* interaction, and running beat 4 as a fresh application instead would skip the one
+thing beat 3 → beat 4 is there to show.
+
+An earlier draft used R$ 560.000 / R$ 112.000 (financiado R$ 448.000). **That combination is
+denied, not manual review**: DTI lands at 47,5%, past POL-004's absolute 40% ceiling
+("reprovadas automaticamente"). Beat 5 needs `manual_review` to put the case in Carlos's
+queue, so a denial breaks every beat after it. R$ 448.000 survives in
+`tests/test_calculator.py` as the pinned PMT reference value ([10](10-domain-credit.md)
+acceptance) and in the denial test — those are correct and should stay.
 
 ### Beat 6 ordering
 

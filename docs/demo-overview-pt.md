@@ -27,7 +27,7 @@ sequenceDiagram
 
     rect rgb(232, 245, 240)
     Note over C,N: 1 · Cliente simula o crédito
-    C->>A: Quero financiar R$ 448 mil em 360 meses
+    C->>A: Imóvel de R$ 400 mil, entrada de R$ 100 mil, 360 meses
     A->>M: Perfil da cliente + política de crédito
     M-->>A: Regras que se aplicam
     A->>A: Calcula parcela, CET, LTV, renda comprometida

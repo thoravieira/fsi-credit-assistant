@@ -47,8 +47,8 @@ def test_has_complete_application_none():
 def test_has_complete_application_all_required_present():
     app = {
         "product": "mortgage",
-        "asset_value": 560_000.0,
-        "down_payment": 112_000.0,
+        "asset_value": 400_000.0,
+        "down_payment": 100_000.0,
         "term_months": 360,
     }
     assert has_complete_application(_base_state(application=app)) == "complete"

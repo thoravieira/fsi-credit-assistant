@@ -25,8 +25,8 @@ def created_application():
     body = {
         "customer_id": "CUST-0001",
         "product": "mortgage",
-        "asset_value": 560_000.0,
-        "down_payment": 112_000.0,
+        "asset_value": 400_000.0,
+        "down_payment": 100_000.0,
         "term_months": 360,
         "purpose": "teste automatizado",
     }
@@ -44,7 +44,7 @@ def test_create_application_returns_id_and_persists(created_application):
     doc = get_db()["applications"].find_one({"_id": application_id})
     assert doc["thread_id"] == application_id
     assert doc["status"] == "draft"
-    assert doc["requested_amount"] == pytest.approx(448_000.0)
+    assert doc["requested_amount"] == pytest.approx(300_000.0)
 
 
 def test_list_applications_filters_by_status(created_application):

@@ -57,18 +57,18 @@ def test_intake_merges_and_marks_complete():
     prior = {"customer_id": "CUST-0001", "product": "mortgage"}
     state = _base_state(
         application=prior,
-        messages=[HumanMessage("Quero financiar com entrada de 112 mil, prazo de 360 meses")],
+        messages=[HumanMessage("Quero financiar com entrada de 100 mil, prazo de 360 meses")],
     )
     fake_llm = _FakeStructuredLLM(
-        _ExtractedFields(asset_value=560_000.0, down_payment=112_000.0, term_months=360)
+        _ExtractedFields(asset_value=400_000.0, down_payment=100_000.0, term_months=360)
     )
 
     result = intake(state, llm=fake_llm)
 
     app = result["application"]
     assert app["product"] == "mortgage"
-    assert app["asset_value"] == 560_000.0
-    assert app["requested_amount"] == pytest.approx(448_000.0)
+    assert app["asset_value"] == 400_000.0
+    assert app["requested_amount"] == pytest.approx(300_000.0)
     assert result["stage"] == "assessment"
 
 
@@ -137,9 +137,9 @@ def test_load_context_reads_seeded_profile():
 def test_policy_retrieval_returns_matched_policies():
     application = {
         "product": "mortgage",
-        "asset_value": 560_000.0,
-        "down_payment": 112_000.0,
-        "requested_amount": 448_000.0,
+        "asset_value": 400_000.0,
+        "down_payment": 100_000.0,
+        "requested_amount": 300_000.0,
         "term_months": 360,
     }
     profile = {
@@ -160,8 +160,8 @@ def test_policy_retrieval_returns_matched_policies():
 def test_credit_calculator_is_pure_and_consistent():
     application = {
         "product": "mortgage",
-        "asset_value": 560_000.0,
-        "requested_amount": 448_000.0,
+        "asset_value": 400_000.0,
+        "requested_amount": 300_000.0,
         "term_months": 360,
     }
     profile = {
@@ -173,7 +173,8 @@ def test_credit_calculator_is_pure_and_consistent():
     result = credit_calculator(state)
     calc = result["calc"]
 
-    assert calc["ltv"] == pytest.approx(0.8)
+    assert calc["ltv"] == pytest.approx(0.75)
+    assert calc["monthly_payment"] == pytest.approx(2658.78, abs=0.01)
     assert calc["cet_annual"] > calc["annual_rate"]
     assert calc["monthly_payment"] > 0
     assert len(calc["schedule_preview"]) == 3
@@ -191,18 +192,22 @@ def test_customer_response_asks_for_missing_fields():
 def test_customer_response_grounds_answer_in_calc_and_policies():
     application = {
         "product": "mortgage",
-        "asset_value": 560_000.0,
-        "down_payment": 112_000.0,
+        "asset_value": 400_000.0,
+        "down_payment": 100_000.0,
         "term_months": 360,
     }
-    calc = {"monthly_payment": 4402.36, "annual_rate": 0.098}
-    decision = {"outcome": "auto_approved", "reasons": ["LTV dentro do limite"], "policy_refs": ["POL-001"]}
+    calc = {"monthly_payment": 2658.78, "annual_rate": 0.106}
+    decision = {
+        "outcome": "manual_review",
+        "reasons": ["LTV de 75% acima de 70%, limite da aprovação automática."],
+        "policy_refs": ["POL-020", "POL-004"],
+    }
     state = _base_state(application=application, calc=calc, decision=decision)
-    fake_llm = FakeListChatModel(responses=["Sua parcela ficou em R$ 4.402,36."])
+    fake_llm = FakeListChatModel(responses=["Sua parcela ficou em R$ 2.658,78."])
 
     result = customer_response(state, llm=fake_llm)
 
-    assert "4.402,36" in result["messages"][0].content
+    assert "2.658,78" in result["messages"][0].content
 
 
 # --- decision node (SDD 05 §1) ---------------------------------------------
@@ -268,6 +273,10 @@ def test_decision_routes_to_review_when_a_human_is_needed(application_row):
 def test_decision_denies_beyond_the_absolute_limits(application_row):
     """The DTI POL-004 calls "reprovação automática" — 448k over 360 months on
     CUST-0001's income lands at 47,5%.
+
+    These are deliberately *not* the demo figures. An early draft of the demo
+    used this combination for beat 4's manual review; it denies, which would
+    leave beat 5 with nothing in Carlos's queue (SDD 16 §2).
     """
     state, result = _assessed(application_row, asset_value=560_000.0, down_payment=112_000.0)
 
