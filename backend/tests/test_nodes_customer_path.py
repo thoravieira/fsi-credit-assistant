@@ -1,7 +1,6 @@
 """SDD 05 — customer-path nodes (router → customer_response).
 
-Per SDD 14 §2: real DB (seeded Day 1 on Atlas), fake LLM. `decision` is
-excluded — it depends on `domain/rules.py`, deferred to the Opus session.
+Per SDD 14 §2: real DB (seeded Day 1 on Atlas), fake LLM.
 """
 
 from unittest.mock import patch
@@ -10,8 +9,10 @@ import pytest
 from langchain_core.language_models.fake_chat_models import FakeListChatModel
 from langchain_core.messages import HumanMessage
 
+from app.db import get_db
 from app.graph.nodes.credit_calculator import credit_calculator
 from app.graph.nodes.customer_response import customer_response
+from app.graph.nodes.decision import decision
 from app.graph.nodes.intake import _ExtractedFields, intake
 from app.graph.nodes.load_context import load_context
 from app.graph.nodes.policy_retrieval import policy_retrieval
@@ -79,6 +80,47 @@ def test_intake_leaves_stage_unchanged_when_incomplete():
 
     assert "stage" not in result
     assert result["application"] == {"product": "mortgage"}
+
+
+def test_intake_rederives_the_financed_amount_on_resimulation():
+    """"e se eu desse mais entrada?" has to move the financed amount.
+
+    Deriving `requested_amount` only when the *merged* application lacks one
+    pins it to whatever the first turn computed: the down payment changes and
+    the LTV, the instalment and the decision all stay put. Re-simulation is the
+    reason customer turns always route back to `intake` (SDD 05 §3), so this is
+    the node's central behaviour, not an edge case.
+    """
+    prior = {
+        "product": "mortgage",
+        "asset_value": 400_000.0,
+        "down_payment": 180_000.0,
+        "term_months": 360,
+        "requested_amount": 220_000.0,
+    }
+    state = _base_state(application=prior, messages=[HumanMessage("e se a entrada fosse 100 mil?")])
+    fake_llm = _FakeStructuredLLM(_ExtractedFields(down_payment=100_000.0))
+
+    result = intake(state, llm=fake_llm)
+
+    assert result["application"]["down_payment"] == 100_000.0
+    assert result["application"]["requested_amount"] == pytest.approx(300_000.0)
+
+
+def test_intake_honours_an_explicitly_stated_financed_amount():
+    prior = {
+        "product": "mortgage",
+        "asset_value": 400_000.0,
+        "down_payment": 180_000.0,
+        "term_months": 360,
+        "requested_amount": 220_000.0,
+    }
+    state = _base_state(application=prior, messages=[HumanMessage("quero financiar 250 mil")])
+    fake_llm = _FakeStructuredLLM(_ExtractedFields(requested_amount=250_000.0))
+
+    result = intake(state, llm=fake_llm)
+
+    assert result["application"]["requested_amount"] == pytest.approx(250_000.0)
 
 
 def test_load_context_reads_seeded_profile():
@@ -163,12 +205,110 @@ def test_customer_response_grounds_answer_in_calc_and_policies():
     assert "4.402,36" in result["messages"][0].content
 
 
-def test_decision_node_blocked_on_domain_rules():
-    """SDD 10 §3 — `domain/rules.py` is deferred to the Opus session. This
-    documents the interface `decision.py` expects:
-    `evaluate(application, calc, profile) -> Decision`. Once rules.py lands,
-    this import will start succeeding — that's the signal to replace this
-    canary with real decision-node tests.
+# --- decision node (SDD 05 §1) ---------------------------------------------
+# `decision` is the only node that writes `applications`. These run against
+# real Atlas (SDD 14 §2) and clean up after themselves.
+
+
+@pytest.fixture
+def application_row():
+    application_id = "APP-TEST-DECISION"
+    db = get_db()
+    db["applications"].insert_one(
+        {
+            "_id": application_id,
+            "thread_id": application_id,
+            "customer_id": "CUST-0001",
+            "status": "draft",
+            "latest_assessment": None,
+        }
+    )
+    yield application_id
+    db["applications"].delete_one({"_id": application_id})
+    db["decisions_log"].delete_many({"application_id": application_id})
+
+
+def _assessed(application_id, *, asset_value, down_payment, term_months=360):
+    """Run `credit_calculator` then `decision` the way the graph does, against
+    the real seeded profile for CUST-0001.
     """
-    with pytest.raises(ModuleNotFoundError):
-        import app.graph.nodes.decision  # noqa: F401
+    application = {
+        "application_id": application_id,
+        "customer_id": "CUST-0001",
+        "product": "mortgage",
+        "asset_value": asset_value,
+        "down_payment": down_payment,
+        "requested_amount": asset_value - down_payment,
+        "term_months": term_months,
+    }
+    profile = get_db()["customer_profiles"].find_one({"_id": "CUST-0001"})
+    state = _base_state(application=application, profile=profile)
+    state["calc"] = credit_calculator(state)["calc"]
+    return state, decision(state)
+
+
+def test_decision_auto_approves_and_closes_the_thread(application_row):
+    state, result = _assessed(application_row, asset_value=400_000.0, down_payment=180_000.0)
+
+    assert result["decision"]["outcome"] == "auto_approved"
+    assert result["stage"] == "closed"
+    assert result["decision"]["reasons"]
+    assert result["decision"]["policy_refs"]
+    assert result["decision"]["breached_rules"] == []
+
+
+def test_decision_routes_to_review_when_a_human_is_needed(application_row):
+    state, result = _assessed(application_row, asset_value=400_000.0, down_payment=100_000.0)
+
+    assert result["decision"]["outcome"] == "manual_review"
+    assert result["stage"] == "review"
+    assert "ltv_auto_approval_limit" in result["decision"]["breached_rules"]
+
+
+def test_decision_denies_beyond_the_absolute_limits(application_row):
+    """The DTI POL-004 calls "reprovação automática" — 448k over 360 months on
+    CUST-0001's income lands at 47,5%.
+    """
+    state, result = _assessed(application_row, asset_value=560_000.0, down_payment=112_000.0)
+
+    assert result["decision"]["outcome"] == "denied"
+    assert result["stage"] == "closed"
+    assert result["decision"]["breached_rules"] == ["dti_absolute_limit"]
+
+
+def test_decision_writes_exactly_one_assessment_event(application_row):
+    """SDD 05 acceptance — an assessed application produces exactly one
+    `assessment` event in `decisions_log`.
+    """
+    _state, result = _assessed(application_row, asset_value=400_000.0, down_payment=180_000.0)
+
+    events = list(get_db()["decisions_log"].find({"application_id": application_row}))
+    assert len(events) == 1
+    event = events[0]
+    assert event["event_type"] == "assessment"
+    assert event["seq"] == 1
+    assert event["thread_id"] == application_row
+    assert event["outcome"] == result["decision"]["outcome"]
+    assert event["policy_refs"] == result["decision"]["policy_refs"]
+    assert event["rationale"]
+
+
+def test_decision_updates_the_application_row(application_row):
+    _state, result = _assessed(application_row, asset_value=400_000.0, down_payment=100_000.0)
+
+    doc = get_db()["applications"].find_one({"_id": application_row})
+    assert doc["status"] == "manual_review"
+    assert doc["latest_assessment"]["decision"] == result["decision"]
+    assert doc["latest_assessment"]["calc"]["ltv"] == pytest.approx(0.75)
+
+
+def test_decision_seq_increments_across_resimulations(application_row):
+    """Mariana re-simulating on the same thread appends, never overwrites — the
+    trace panel reads `decisions_log` in `seq` order.
+    """
+    _assessed(application_row, asset_value=400_000.0, down_payment=180_000.0)
+    _assessed(application_row, asset_value=400_000.0, down_payment=100_000.0)
+
+    events = list(get_db()["decisions_log"].find({"application_id": application_row}).sort("seq", 1))
+    assert [e["seq"] for e in events] == [1, 2]
+    assert [e["outcome"] for e in events] == ["auto_approved", "manual_review"]

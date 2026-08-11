@@ -15,7 +15,7 @@ from typing import AsyncIterator, Literal
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessageChunk, HumanMessage
 from langgraph.types import Command
 from pydantic import BaseModel
 
@@ -102,7 +102,12 @@ def get_application(application_id: str):
 
 @app.get("/api/trace/{thread_id}")
 def get_trace(thread_id: str):
-    docs = list(get_db()["decisions_log"].find({"thread_id": thread_id}).sort("seq", 1))
+    # `decisions_log` entries are inserted without an `_id`, so Mongo assigns an
+    # ObjectId, which FastAPI's encoder cannot serialise. Project it away: the
+    # trace panel identifies events by `application_id` + `seq`.
+    docs = list(
+        get_db()["decisions_log"].find({"thread_id": thread_id}, {"_id": 0}).sort("seq", 1)
+    )
     return {"thread_id": thread_id, "events": docs}
 
 
@@ -136,6 +141,56 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, default=str, ensure_ascii=False)}\n\n"
 
 
+# Nodes whose LLM calls are machinery rather than prose. `intake` uses
+# `with_structured_output`, so streaming it verbatim puts raw extraction JSON in
+# the customer's chat window. Everything else is presentational by default, so
+# `analyst_brief` and `negotiation` stream as soon as session 6 adds them.
+_SILENT_LLM_NODES = {"intake"}
+
+
+def _is_customer_facing_token(message_chunk, meta: dict) -> bool:
+    """SDD 11 §2 — a `token` event is a piece of the answer being written.
+
+    `stream_mode="messages"` yields two different things under one mode: the
+    `AIMessageChunk`s an LLM emits while streaming, and the finished `AIMessage`
+    a node writes into `messages`. Forwarding both sends the whole answer twice,
+    once token by token and once entire.
+    """
+    if not isinstance(message_chunk, AIMessageChunk):
+        return False
+    return meta.get("langgraph_node") not in _SILENT_LLM_NODES
+
+
+def _hydrate_application(thread_id: str, existing: dict | None) -> dict | None:
+    """SDD 04 §1 — `thread_id == application_id`.
+
+    The graph has no other way to learn which application it is working on:
+    `/api/chat` carries a thread id, and `decision` needs an `application_id`
+    while `load_context` needs a `customer_id`. This is where HTTP identity
+    becomes graph state.
+
+    Anything already in the checkpoint wins over the stored row, because
+    `application` is an overwrite field: re-hydrating it wholesale on every
+    turn would discard the patches `intake` made on previous turns and silently
+    undo a re-simulation.
+    """
+    row = get_db()["applications"].find_one({"_id": thread_id})
+    if row is None:
+        return existing
+
+    stored = {
+        "application_id": row["_id"],
+        "customer_id": row.get("customer_id"),
+        "product": row.get("product"),
+        "asset_value": row.get("asset_value"),
+        "down_payment": row.get("down_payment"),
+        "requested_amount": row.get("requested_amount"),
+        "term_months": row.get("term_months"),
+        "purpose": row.get("purpose", ""),
+    }
+    return {**stored, **(existing or {})}
+
+
 async def stream_chat_events(
     graph, thread_id: str, persona: str, message: str
 ) -> AsyncIterator[str]:
@@ -151,6 +206,11 @@ async def stream_chat_events(
     """
     config = {"configurable": {"thread_id": thread_id}}
     payload = {"persona": persona, "messages": [HumanMessage(message)]}
+
+    snapshot = await graph.aget_state(config)
+    application = _hydrate_application(thread_id, snapshot.values.get("application"))
+    if application is not None:
+        payload["application"] = application
 
     t_prev = time.perf_counter()
     pending_detail: dict = {}
@@ -177,7 +237,9 @@ async def stream_chat_events(
                 if update:
                     final_state.update(update)
         elif mode == "messages":
-            message_chunk, _meta = chunk
+            message_chunk, meta = chunk
+            if not _is_customer_facing_token(message_chunk, meta):
+                continue
             text = getattr(message_chunk, "content", "")
             if text:
                 yield _sse("token", {"text": text})

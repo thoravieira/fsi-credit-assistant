@@ -56,13 +56,20 @@ def intake(state: AgentState, *, llm: BaseChatModel | None = None) -> dict:
         ]
     )
 
+    fields = extracted.model_dump()
     merged = dict(prior)
-    for field, value in extracted.model_dump().items():
+    for field, value in fields.items():
         if value is not None:
             merged[field] = value
 
+    # Re-derive the financed amount unless *this turn* stated one explicitly.
+    # Keying off `merged` instead would pin `requested_amount` to whatever the
+    # first turn computed, so "e se eu desse mais entrada?" would change the
+    # down payment and leave the financed amount — and therefore the LTV, the
+    # instalment and the decision — untouched. That re-simulation is the whole
+    # reason customer turns always route back here (SDD 05 §3).
     if (
-        merged.get("requested_amount") is None
+        fields.get("requested_amount") is None
         and merged.get("asset_value") is not None
         and merged.get("down_payment") is not None
     ):

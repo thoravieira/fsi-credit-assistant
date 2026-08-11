@@ -53,18 +53,58 @@ Deterministic. Mirrors the seeded policies. Returns a `Decision` with populated
 `age_at_maturity = current_age_years + term_months / 12` — the "idade + prazo ≤ 80 anos"
 rule.
 
-| Outcome | Conditions |
-|---|---|
-| `auto_approved` | **All of:** LTV ≤ 0.70 · DTI ≤ 0.30 · internal score ≥ 700 · `age_at_maturity` ≤ 80 · income verified |
-| `manual_review` | LTV ≤ 0.80 · DTI ≤ 0.40 · score ≥ 600 · `age_at_maturity` ≤ 80 |
-| `denied` | Anything beyond manual-review bounds, or a hard legal block |
-
 `dti` includes pre-existing debt:
 `(monthly_payment + existing_monthly_debt) / net_monthly`.
 
+### Thresholds are per product
+
+The corpus seeded in Day 1 sets **different limits for `mortgage` and `auto`**, so the
+matrix is a table per product, not one shared grid. Every threshold below carries the policy
+that states it; §4 asserts the correspondence.
+
+| Rule id | `mortgage` | `auto` |
+|---|---|---|
+| `ltv_auto_approval_limit` | ≤ 0.70 · POL-020 | ≤ 0.80 · POL-021 |
+| `dti_auto_approval_limit` | ≤ 0.30 · POL-004 | ≤ 0.35 · POL-005 |
+| `score_auto_approval_floor` | ≥ 750 · POL-008 | ≥ 700 · POL-009 |
+| `amount_auto_approval_limit` | ≤ R$ 300.000 · POL-020 | ≤ R$ 80.000 · POL-021 |
+| `ltv_absolute_limit` | ≤ 0.80 · POL-001 | ≤ 0.80 · POL-003 |
+| `dti_absolute_limit` | ≤ 0.40 · POL-004 | ≤ 0.45 · POL-005 |
+| `score_absolute_floor` | ≥ 650 · POL-008 | ≥ 600 · POL-009 |
+| `age_at_maturity_limit` | ≤ 80 anos · POL-006 | ≤ 80 anos · POL-007 |
+| `income_verification` | verified · POL-012 | verified · POL-013 |
+
+### Outcomes
+
+| Outcome | Conditions |
+|---|---|
+| `denied` | Any `*_absolute_*` or `age_at_maturity_limit` rule breached |
+| `auto_approved` | No absolute breach **and** every `*_auto_approval_*` rule satisfied **and** income verified |
+| `manual_review` | No absolute breach, but at least one auto-approval rule breached |
+
+`breached_rules` carries the rule ids that produced the outcome: the absolute rules for
+`denied`, the auto-approval rules for `manual_review`, and `[]` for `auto_approved`.
+
 Every returned `Decision` must populate `reasons` in Portuguese (they are shown to Mariana
-and Carlos) and `policy_refs` with the `POL-xxx` ids that justify the outcome. A decision
+and Carlos) and `policy_refs` with the `POL-xxx` ids that justify the outcome — including on
+`auto_approved`, where the citations are the limits the application stayed within. A decision
 without citations is not explainable, and explainability is a scored criterion.
+
+### Deliberately not implemented
+
+Two policy families have no input in `AgentState` ([04 §2](04-graph-state.md)) and are out of
+scope rather than silently approximated:
+
+- **POL-022 / POL-023 — inventário.** The "hard legal block" is a documental restriction.
+  `CreditApplication` carries no property-status field, so no probate check runs. Adding one
+  means adding the field first.
+- **POL-002 vs POL-003 — veículo novo vs. usado.** `CreditApplication` has no vehicle-age
+  field, so `auto` uses POL-003's conservative 0.80 rather than POL-002's 0.90 for new
+  vehicles. This under-approves rather than over-approves, which is the correct direction to
+  fail.
+
+Both are stated in the README's limitations section. Volunteering them is stronger than
+being caught on them.
 
 ---
 
@@ -72,8 +112,14 @@ without citations is not explainable, and explainability is a scored criterion.
 
 **`rules.py` and the `credit_policies` corpus encode the same thresholds.**
 
-`tests/test_policy_consistency.py` asserts that every threshold in `rules.py` appears in at
-least one policy document.
+`tests/test_policy_consistency.py` asserts, for every threshold in the §3 table, that the
+value appears **in the specific policy `rules.py` cites** and that the policy's `product`
+front-matter matches the product the threshold applies to.
+
+"Appears in at least one policy document" is too weak a check to be worth writing: `700`
+appears in POL-009, so a mortgage rule citing a score floor of 700 would pass while every
+mortgage score policy on screen says 750 or 650. The assertion has to be per-citation and
+per-product or it certifies nothing.
 
 The failure this prevents: the agent cites POL-014 for a rule the code does not implement.
 A panel member who reads the cited policy on screen and finds it says 75% while the system
@@ -90,7 +136,8 @@ divergence and exactly what a test is for.
 - [ ] `cet_annual` > `annual_rate` for every scenario with fees, always.
 - [ ] `dti` includes `existing_monthly_debt`.
 - [ ] `rules.py` returns `auto_approved` / `manual_review` / `denied` correctly at every
-      boundary value (test each threshold at −0.01, exact, +0.01).
-- [ ] Every `Decision` has non-empty `reasons` and `policy_refs`.
+      boundary value in the §3 table, for **both** products (test each threshold at −0.01,
+      exact, +0.01 — the exact value is inside the limit, since every rule is `≤` / `≥`).
+- [ ] Every `Decision` has non-empty `reasons` and `policy_refs`, `auto_approved` included.
 - [ ] `tests/test_policy_consistency.py` passes.
 - [ ] Zero imports from `langchain*` or `langgraph*` in `domain/`.

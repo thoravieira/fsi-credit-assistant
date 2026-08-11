@@ -71,6 +71,19 @@ async for mode, chunk in graph.astream(
 | `messages` | LLM tokens | `token` events |
 | `custom` | Whatever nodes emit via `get_stream_writer()` | The `detail` payload inside `trace` |
 
+### `payload` carries the application, and this endpoint is what puts it there
+
+`/api/chat` receives a `thread_id` and nothing else identifying the case, but `decision`
+needs `application_id` and `load_context` needs `customer_id`. [04 §1](04-graph-state.md)
+says `thread_id == application_id`; **this endpoint is the only code that acts on it.**
+Without the hydration step the customer path reaches `decision` with no `application_id`,
+and — because `load_context` finds no profile — a `net_monthly` fallback that puts DTI in the
+hundreds.
+
+Anything already in the checkpoint wins over the stored row. `application` is an overwrite
+field ([04 §2](04-graph-state.md)), so re-hydrating it wholesale each turn would discard the
+patches `intake` made on earlier turns and silently undo a re-simulation.
+
 Rich detail is emitted from inside nodes:
 
 ```python
