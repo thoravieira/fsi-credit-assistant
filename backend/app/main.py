@@ -99,8 +99,12 @@ def create_application(body: CreateApplicationRequest):
 
 
 @app.get("/api/applications")
-def list_applications(status: str | None = None):
-    query = {"status": status} if status else {}
+def list_applications(status: str | None = None, customer_id: str | None = None):
+    query: dict = {}
+    if status:
+        query["status"] = status
+    if customer_id:
+        query["customer_id"] = customer_id
     docs = list(get_db()["applications"].find(query).sort("created_at", -1))
     return {"applications": docs}
 
@@ -111,6 +115,47 @@ def get_application(application_id: str):
     if doc is None:
         raise HTTPException(status_code=404, detail="application not found")
     return doc
+
+
+def _message_text(message) -> str:
+    """Same text-extraction rule as `agent/negotiation.py`'s `_text` — content
+    is a plain string for ordinary turns, or a list of content-block dicts for
+    some provider responses. Duplicated rather than imported: that helper
+    lives in the deep-agent module for a `messages` list shaped by the graph's
+    own reducer, not the deep agent.
+    """
+    content = getattr(message, "content", "")
+    if isinstance(content, str):
+        return content
+    return "".join(part.get("text", "") for part in content if isinstance(part, dict))
+
+
+@app.get("/api/history/{thread_id}")
+async def get_history(thread_id: str, request: Request):
+    """The real conversation for a thread, read back from the LangGraph
+    checkpoint — the only durable copy of it. `decisions_log` (`/api/trace`)
+    is a structured audit trail of *events*, not the prose turns themselves;
+    `applications` carries only the latest snapshot. Only human/AI turns are
+    returned: `AgentState.messages` never carries a bare SystemMessage or a
+    deep-agent tool-call message (`agent/negotiation.py`'s `_map_result` only
+    ever appends the agent's final answer), so no filtering beyond message
+    type is needed to keep this to what the customer or analyst actually saw.
+    """
+    graph = request.app.state.graph
+    config = {"configurable": {"thread_id": thread_id}}
+    snapshot = await graph.aget_state(config)
+    raw_messages = snapshot.values.get("messages") or []
+
+    messages = []
+    for message in raw_messages:
+        if message.type not in ("human", "ai"):
+            continue
+        text = _message_text(message)
+        if not text:
+            continue
+        messages.append({"role": "user" if message.type == "human" else "assistant", "text": text})
+
+    return {"thread_id": thread_id, "messages": messages}
 
 
 @app.get("/api/trace/{thread_id}")

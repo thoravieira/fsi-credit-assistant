@@ -3,7 +3,7 @@ import { ChatInputBar, ChatMessages } from './ChatThread';
 import { DecisionCard } from './DecisionCard';
 import type { ChatMessage } from '../hooks/useAgentStream';
 import type { Decision } from '../lib/api';
-import { OUTCOME_LABELS, POLICY_TEXT, fmtBRL, fmtBRL0, fmtPct } from '../lib/api';
+import { OUTCOME_LABELS, POLICY_TEXT, fmtBRL0, fmtPct } from '../lib/api';
 
 // Content rendered inside the iPhone bezel for Mariana's route (`/`). Toggles
 // between the simulation form and the chat/result view — matches the target
@@ -26,6 +26,8 @@ export function CustomerApp({
   threadId,
   formOpen,
   onOpenForm,
+  onOpenHistory,
+  historyLoading,
   messages,
   onSend,
   decision,
@@ -47,15 +49,17 @@ export function CustomerApp({
   threadId: string | null;
   formOpen: boolean;
   onOpenForm: () => void;
+  onOpenHistory: () => void;
+  historyLoading: boolean;
   messages: ChatMessage[];
   onSend: (text: string) => void;
   decision: Decision | null;
   traceExpanded: boolean;
   onToggleTrace: () => void;
 }) {
-  // A restored session (app/page.tsx rehydrating from a stored thread) can
-  // have a decision with no live chat messages — the transcript itself isn't
-  // recoverable, but the result and its explanation still need to show.
+  // Explicitly loaded via the history icon (real `GET /api/history` +
+  // `GET /api/applications`, app/page.tsx's `openHistory`) — this screen
+  // never auto-restores anything on its own.
   const chatVisible = !formOpen && (messages.length > 0 || !!decision);
   const reasons = decision ? decision.reasons ?? (decision.rationale ? [decision.rationale] : []) : [];
 
@@ -78,6 +82,35 @@ export function CustomerApp({
         <div>
           <div className="text-[10.5px] uppercase tracking-[0.08em] text-white/45">Crédito imobiliário</div>
           <div className="mt-0.5 text-[21px] font-bold text-white">{formOpen ? 'Simular crédito' : 'Sua simulação'}</div>
+        </div>
+      </div>
+
+      {/* Always visible, on the form and on the chat — the only two ways in
+          or out of a case: reopen the simulation form, or pull the real
+          conversation for this thread from MongoDB (never a local cache). */}
+      <div className="flex flex-none items-center justify-between border-b border-[#E7E9E8] bg-white px-3.5 py-2">
+        <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink/55">Nova simulação</span>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={onOpenHistory}
+            disabled={!threadId || historyLoading}
+            title="Abrir histórico"
+            className="flex h-7 w-7 items-center justify-center border border-[rgba(0,30,43,0.2)] bg-white disabled:opacity-40"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00684A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+          </button>
+          <button
+            onClick={onOpenForm}
+            title="Nova simulação"
+            className="flex h-7 w-7 items-center justify-center border border-[rgba(0,30,43,0.2)] bg-white"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00684A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" />
+              <line x1="12" y1="18" x2="12" y2="12" /><line x1="9" y1="15" x2="15" y2="15" />
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -207,20 +240,9 @@ export function CustomerApp({
             </div>
           </div>
 
-          {/* Pinned footer: the simulation summary is always the last "message",
-              directly above the composer — neither ever needs scrolling to reach. */}
-          <div className="flex flex-none flex-col gap-2 border-t border-[#E7E9E8] bg-[#F4F5F6] px-3.5 pb-2.5 pt-2">
-            <button onClick={onOpenForm} className="flex w-full items-center justify-between border border-[rgba(0,30,43,0.2)] bg-white px-3.5 py-3">
-              <span className="flex min-w-0 items-center gap-2.5">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00684A" strokeWidth="2" strokeLinecap="round">
-                  <path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 3v6h-6" />
-                </svg>
-                <span className="text-left text-[12px] font-semibold text-ink">
-                  {fmtBRL0(assetValue)} · entrada {fmtBRL0(downPayment)} · {termMonths} meses
-                </span>
-              </span>
-              <span className="flex-none text-[11px] font-bold text-forest">Nova simulação</span>
-            </button>
+          {/* Pinned footer: the composer is always the last thing on screen —
+              reopening the form is the icon in the utility bar above now. */}
+          <div className="flex flex-none border-t border-[#E7E9E8] bg-[#F4F5F6] px-3.5 pb-2.5 pt-2">
             <ChatInputBar onSend={onSend} disabled={isStreaming} placeholder="Escreva para o assistente…" />
           </div>
         </div>

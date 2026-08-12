@@ -20,6 +20,7 @@ export interface UseAgentStreamResult {
   scenarios: Scenario[];
   isStreaming: boolean;
   send: (message: string) => Promise<void>;
+  hydrate: (data: { messages: ChatMessage[]; decision?: Decision | null }) => void;
 }
 
 /**
@@ -98,5 +99,15 @@ export function useAgentStream(threadId: string, persona: Persona): UseAgentStre
     [threadId, persona]
   );
 
-  return { trace, messages, calc, decision, pendingApproval, scenarios, isStreaming, send };
+  // Seeds this hook's own `messages`/`decision` from data fetched elsewhere —
+  // real MongoDB history (`GET /api/history`), not a simulated turn. Nothing
+  // else on the hook is touched: `trace` stays empty (there is no durable,
+  // replayable trace for a past turn) and a `send()` afterwards appends to
+  // `messages` exactly as it would after any other turn.
+  const hydrate = useCallback((data: { messages: ChatMessage[]; decision?: Decision | null }) => {
+    setMessages(data.messages);
+    if (data.decision !== undefined) setDecision(data.decision);
+  }, []);
+
+  return { trace, messages, calc, decision, pendingApproval, scenarios, isStreaming, send, hydrate };
 }

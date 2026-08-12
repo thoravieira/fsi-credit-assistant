@@ -174,13 +174,16 @@ function normalizeApplication(doc: Record<string, any>): CreditApplication {
   return { ...doc, application_id: doc._id ?? doc.application_id } as CreditApplication;
 }
 
-export async function listApplications(status?: string): Promise<CreditApplication[]> {
-  const url = status
-    ? `${BASE_URL}/api/applications?status=${encodeURIComponent(status)}`
-    : `${BASE_URL}/api/applications`;
-  const res = await fetch(url);
+export async function listApplications(filter?: { status?: string; customerId?: string }): Promise<CreditApplication[]> {
+  const params = new URLSearchParams();
+  if (filter?.status) params.set('status', filter.status);
+  if (filter?.customerId) params.set('customer_id', filter.customerId);
+  const qs = params.toString();
+  const res = await fetch(`${BASE_URL}/api/applications${qs ? '?' + qs : ''}`);
   if (!res.ok) throw new Error(`/api/applications failed: ${res.status}`);
   const body = await res.json();
+  // Server sorts by `created_at` desc — callers that want "the customer's
+  // current case" can just take index 0.
   return ((body.applications ?? []) as Record<string, any>[]).map(normalizeApplication);
 }
 
@@ -188,6 +191,37 @@ export async function getApplication(applicationId: string): Promise<CreditAppli
   const res = await fetch(`${BASE_URL}/api/applications/${encodeURIComponent(applicationId)}`);
   if (!res.ok) throw new Error(`/api/applications/${applicationId} failed: ${res.status}`);
   return normalizeApplication(await res.json());
+}
+
+export interface HistoryMessage {
+  role: 'user' | 'assistant';
+  text: string;
+}
+
+// The real transcript for a thread, read back from the LangGraph checkpoint
+// (`GET /api/history`) — not a local cache. `applications.latest_assessment`/
+// `final_decision` only ever hold the *last* snapshot of each producer, so a
+// case that has been both auto-assessed and analyst-approved, then
+// re-simulated, needs its own current-vs-stale check — see `currentDecisionOf`.
+export async function getHistory(threadId: string): Promise<HistoryMessage[]> {
+  const res = await fetch(`${BASE_URL}/api/history/${encodeURIComponent(threadId)}`);
+  if (!res.ok) throw new Error(`/api/history/${threadId} failed: ${res.status}`);
+  const body = await res.json();
+  return (body.messages ?? []) as HistoryMessage[];
+}
+
+// `applications.status` is the one field both producers (the automatic
+// `decision` node and the analyst's `persist_decision`) always update
+// together with their own decision object, so whichever object's `outcome`
+// currently matches `status` is the live one — the other is a stale snapshot
+// left over from before the most recent write. A customer re-simulating on an
+// already-approved thread is exactly the case this resolves (SDD 04 §2 has no
+// single "current decision" field — this is the client-side rule for it).
+export function currentDecisionOf(app: CreditApplication): Decision | null {
+  if (!app.status) return null;
+  if (app.final_decision?.outcome === app.status) return app.final_decision;
+  if (app.latest_assessment?.decision?.outcome === app.status) return app.latest_assessment.decision;
+  return app.final_decision ?? app.latest_assessment?.decision ?? null;
 }
 
 export async function approve(

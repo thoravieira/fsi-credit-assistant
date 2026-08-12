@@ -13,7 +13,7 @@ import { ScenarioTable } from '../../components/ScenarioTable';
 import { CaseQueue, toPendingCase } from '../../components/CaseQueue';
 import {
   CUSTOMER_NAMES, CreditApplication, OUTCOME_LABELS, PRODUCT_LABELS,
-  approve, fmtBRL, getApplication, listApplications,
+  approve, currentDecisionOf, fmtBRL, getApplication, listApplications,
 } from '../../lib/api';
 
 // Instruction text sent to the deep agent, not fabricated numbers — the
@@ -89,7 +89,11 @@ export default function ConsolePage() {
   const counts = { pending: pending.length, approved: approvedList.length, denied: deniedList.length };
   const listForTab = tab === 'pending' ? pending : tab === 'approved' ? approvedList : deniedList;
 
-  const shownDecision = decision ?? selectedApp?.final_decision ?? selectedApp?.latest_assessment?.decision ?? null;
+  // `currentDecisionOf` picks whichever of `final_decision`/`latest_assessment`
+  // actually matches the application's current `status` — a plain `??` fallback
+  // would show a stale approved decision after the customer re-simulates on
+  // the same thread and it comes back denied (found live, see memory).
+  const shownDecision = decision ?? (selectedApp ? currentDecisionOf(selectedApp) : null);
 
   const runLever = (key: string) => {
     const lever = LEVERS.find((l) => l.key === key);
