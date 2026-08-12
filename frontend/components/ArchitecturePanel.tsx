@@ -42,6 +42,7 @@ export function ArchitecturePanel({
   onOpenNode,
   replay,
   focus,
+  heightPercent = 62,
 }: {
   persona: Persona;
   trace: TraceEvent[];
@@ -49,6 +50,7 @@ export function ArchitecturePanel({
   onOpenNode: (id: string) => void;
   replay?: { label: string; nodeId: string } | null;
   focus?: FocusState | null;
+  heightPercent?: number;
 }) {
   const seq = persona === 'customer' ? LANE_SEQ_CUST : LANE_SEQ_ANA;
   const branchChips = persona === 'customer' ? BRANCH_CHIPS_CUST : BRANCH_CHIPS_ANA;
@@ -89,7 +91,7 @@ export function ArchitecturePanel({
   const statusActive = !!liveActiveId || waiting;
 
   return (
-    <div className="flex flex-none flex-col overflow-hidden border-b-2 border-charcoal/40 px-[18px] pb-2.5 pt-3.5" style={{ height: '62%' }}>
+    <div className="flex flex-none flex-col overflow-hidden border-b-2 border-charcoal/40 px-[18px] pb-2.5 pt-3.5" style={{ height: heightPercent + '%' }}>
       <div className="mb-2.5 flex flex-none items-center justify-between gap-3">
         <span className="whitespace-nowrap text-[12px] font-extrabold uppercase tracking-[0.05em]">Fluxo em tempo real</span>
         <span
