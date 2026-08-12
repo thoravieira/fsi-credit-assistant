@@ -229,6 +229,12 @@ export function previewLtv(assetValue: number, downPayment: number): number {
 export function fmtBRL(v: number): string {
   return 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+// Whole-reais display for form fields (sliders, headline amounts) — the
+// design's `fmtBRL0`; `fmtBRL` (with cents) stays for money the customer
+// actually sees quoted back in prose.
+export function fmtBRL0(v: number): string {
+  return 'R$ ' + v.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+}
 export function fmtPct(v: number): string {
   return (v * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
 }

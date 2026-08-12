@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   CalcResult, Decision, PendingApproval, Persona, Scenario, SendChatInput, TraceEvent,
   streamChat,
@@ -40,7 +40,6 @@ export function useAgentStream(threadId: string, persona: Persona): UseAgentStre
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
-  const assistantIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setTrace([]);
@@ -49,7 +48,6 @@ export function useAgentStream(threadId: string, persona: Persona): UseAgentStre
     setDecision(null);
     setPendingApproval(null);
     setScenarios([]);
-    assistantIdRef.current = null;
   }, [threadId]);
 
   const send = useCallback(
@@ -64,12 +62,18 @@ export function useAgentStream(threadId: string, persona: Persona): UseAgentStre
               setTrace((prev) => [...prev.slice(-59), evt]);
               break;
             case 'token':
+              // Pure updater — derives "is there an in-progress assistant
+              // message" from `prev` itself rather than a ref mutated as a
+              // side effect. React 18 Strict Mode double-invokes updaters in
+              // dev; a ref written inside the updater gets set on the
+              // discarded first call, so the committed second call never
+              // finds a matching id and silently drops every token.
               setMessages((prev) => {
-                if (!assistantIdRef.current) {
-                  assistantIdRef.current = 'a-' + Date.now();
-                  return [...prev, { id: assistantIdRef.current, role: 'assistant', text: evt.text, streaming: true }];
+                const last = prev[prev.length - 1];
+                if (last && last.role === 'assistant' && last.streaming) {
+                  return prev.map((m, i) => (i === prev.length - 1 ? { ...m, text: m.text + evt.text } : m));
                 }
-                return prev.map((m) => (m.id === assistantIdRef.current ? { ...m, text: m.text + evt.text } : m));
+                return [...prev, { id: 'a-' + Date.now(), role: 'assistant', text: evt.text, streaming: true }];
               });
               break;
             case 'state':
@@ -79,8 +83,11 @@ export function useAgentStream(threadId: string, persona: Persona): UseAgentStre
               if (evt.scenarios) setScenarios(evt.scenarios);
               break;
             case 'done':
-              setMessages((prev) => prev.map((m) => (m.id === assistantIdRef.current ? { ...m, streaming: false } : m)));
-              assistantIdRef.current = null;
+              setMessages((prev) => {
+                const last = prev[prev.length - 1];
+                if (!last || last.role !== 'assistant') return prev;
+                return prev.map((m, i) => (i === prev.length - 1 ? { ...m, streaming: false } : m));
+              });
               break;
           }
         }

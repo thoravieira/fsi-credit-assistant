@@ -3,6 +3,23 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body { margin: 0; padding: 0; }
+html, body { margin: 0; padding: 0; background: #f3f2f2; }
 a { color: #00684A; }
 a:hover { color: #00ED64; }
+
+/* Flat "Modernist" system: zero radius everywhere, strong 2px dividers —
+   see the Claude Design project's _ds/modernist readme. Enforced by
+   discipline (no rounded-* utilities used) rather than a global override,
+   since a handful of literal circles (status dots, icon glyphs) are drawn
+   as SVG, not via border-radius. */
+
+@keyframes caret { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes softBlink { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes rowIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+
+.animate-caret { animation: caret .8s step-end infinite; }
+.animate-soft-blink { animation: softBlink 1.4s infinite; }
+.animate-row-in { animation: rowIn .3s ease; }
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: rgba(32, 30, 29, .22); }

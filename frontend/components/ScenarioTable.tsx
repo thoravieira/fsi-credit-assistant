@@ -34,7 +34,7 @@ export function ScenarioTable({ scenarios }: { scenarios: Scenario[] }) {
               <td className="border-b border-ink/[0.08] px-2.5 py-2 text-right font-mono">{s.resumo.ltv}</td>
               <td className="border-b border-ink/[0.08] px-2.5 py-2 text-right font-mono">{s.resumo.comprometimento_renda}</td>
               <td className="border-b border-ink/[0.08] px-2.5 py-2">
-                <span className={'rounded-full px-2 py-0.5 text-[10.5px] font-bold ' + (ok(s) ? 'bg-spring/20 text-forest' : 'bg-ink/[0.08] text-ink')}>
+                <span className={'px-2 py-0.5 text-[10px] font-bold ' + (ok(s) ? 'bg-spring/20 text-forest' : 'bg-ink/[0.08] text-ink')}>
                   {OUTCOME_LABELS[s.outcome] ?? s.outcome}
                 </span>
               </td>

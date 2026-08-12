@@ -1,11 +1,16 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAgentStream } from '../../hooks/useAgentStream';
+import { useReplay } from '../../hooks/useReplay';
+import { AppShell } from '../../components/AppShell';
+import { RightPane } from '../../components/RightPane';
+import type { FocusState } from '../../components/ArchitecturePanel';
+import { Drawer, type DrawerState } from '../../components/Drawer';
+import { laneCardId } from '../../lib/archMeta';
 import { DecisionCard } from '../../components/DecisionCard';
 import { ChatThread } from '../../components/ChatThread';
 import { ScenarioTable } from '../../components/ScenarioTable';
 import { CaseQueue, toPendingCase } from '../../components/CaseQueue';
-import { TracePanel } from '../../components/TracePanel';
 import {
   CUSTOMER_NAMES, CreditApplication, OUTCOME_LABELS, PRODUCT_LABELS,
   approve, fmtBRL, getApplication, listApplications,
@@ -22,12 +27,16 @@ const LEVERS = [
   { key: 'open_finance', label: 'Solicitar Open Finance', prompt: 'Consulte os ativos elegíveis via Open Finance da cliente e avalie se servem como fator compensatório para a proposta atual.' },
 ];
 
+const TAB_LABEL = { pending: 'Pendentes', approved: 'Aprovados', denied: 'Reprovações' } as const;
+
 export default function ConsolePage() {
   const [tab, setTab] = useState<'pending' | 'approved' | 'denied'>('pending');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [applications, setApplications] = useState<CreditApplication[]>([]);
   const [selectedApp, setSelectedApp] = useState<CreditApplication | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [drawer, setDrawer] = useState<DrawerState>(null);
+  const [focus, setFocus] = useState<FocusState | null>(null);
   const openedRef = useRef<Set<string>>(new Set());
 
   const refreshQueue = useCallback(() => {
@@ -44,7 +53,21 @@ export default function ConsolePage() {
     getApplication(selectedId).then(setSelectedApp);
   }, [selectedId]);
 
+  // Switching cases means switching trace history — the flow diagram should
+  // stop pointing at whatever step was focused for the previous case.
+  useEffect(() => {
+    setFocus(null);
+    setDrawer(null);
+  }, [selectedId]);
+
   const { trace, messages, decision, pendingApproval, scenarios, send, isStreaming } = useAgentStream(selectedId ?? '', 'analyst');
+  const { replay, start: startReplay } = useReplay();
+
+  const sendAndReset = (message: string) => {
+    setFocus(null);
+    setDrawer(null);
+    return send(message);
+  };
 
   // Carlos's first look at a fresh case: SDD 05 §1 routes an analyst turn on
   // a case still in `review` to `precedent_search` → `analyst_brief`, which
@@ -70,11 +93,11 @@ export default function ConsolePage() {
 
   const runLever = (key: string) => {
     const lever = LEVERS.find((l) => l.key === key);
-    if (lever) send(lever.prompt);
+    if (lever) sendAndReset(lever.prompt);
   };
 
   const stateVerdict = (outcome: 'approved' | 'denied') => {
-    send(outcome === 'approved' ? 'Aprovar a proposta apresentada.' : 'Reprovar a proposta, não seguir com o crédito.');
+    sendAndReset(outcome === 'approved' ? 'Aprovar a proposta apresentada.' : 'Reprovar a proposta, não seguir com o crédito.');
   };
 
   const confirmApproval = async () => {
@@ -91,69 +114,101 @@ export default function ConsolePage() {
   };
 
   return (
-    <div className="flex h-full">
-      <div className="w-1/2 overflow-auto bg-[#F7F8F7] p-7">
-        {!selectedApp ? (
-          <div className="flex flex-col gap-4">
-            <div>
-              <div className="text-[20px] font-extrabold">Console do analista</div>
-              <div className="text-[12.5px] text-ink/55">Carlos · fila de crédito</div>
+    <AppShell
+      left={
+        <div className="flex-1 overflow-auto p-6">
+          {!selectedApp ? (
+            <div className="flex flex-col gap-4">
+              <div>
+                <div className="text-[21px] font-extrabold">Console do analista</div>
+                <div className="mt-0.5 text-[12.5px] text-charcoal/55">Carlos · fila de crédito</div>
+              </div>
+              <div className="flex border border-charcoal/40">
+                {(['pending', 'approved', 'denied'] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setTab(t)}
+                    className={'flex-1 border-y-0 border-l-0 border-r border-charcoal/40 px-[11px] py-[13px] text-left last:border-r-0 ' + (tab === t ? 'bg-charcoal text-paper' : 'bg-white text-charcoal')}
+                  >
+                    <div className="text-[23px] font-extrabold leading-none">{counts[t]}</div>
+                    <div className="mt-1 text-[10.5px] font-semibold uppercase tracking-[0.05em]">{TAB_LABEL[t]}</div>
+                  </button>
+                ))}
+              </div>
+              <CaseQueue cases={listForTab.map(toPendingCase)} onSelect={setSelectedId} />
             </div>
-            <div className="flex border border-ink/[0.14]">
-              {(['pending', 'approved', 'denied'] as const).map((t) => (
-                <button key={t} onClick={() => setTab(t)} className={'flex-1 border-r border-ink/[0.14] px-2.5 py-3.5 text-left last:border-r-0 ' + (tab === t ? 'bg-ink text-white' : 'bg-white text-ink')}>
-                  <div className="text-[22px] font-extrabold leading-none">{counts[t]}</div>
-                  <div className="mt-1 text-[11.5px] font-semibold">{t === 'pending' ? 'Pendentes' : t === 'approved' ? 'Aprovados' : 'Reprovações'}</div>
-                </button>
-              ))}
-            </div>
-            <CaseQueue cases={listForTab.map(toPendingCase)} onSelect={setSelectedId} />
-          </div>
-        ) : (
-          <div className="flex flex-col gap-4">
-            <button onClick={() => setSelectedId(null)} className="self-start text-[12.5px] font-bold text-ink/55">← Fila de casos</button>
-            <div className="border border-ink/[0.14] p-4">
-              <div className="text-[16px] font-extrabold">{CUSTOMER_NAMES[selectedApp.customer_id] ?? selectedApp.customer_id}</div>
-              <div className="text-[12px] text-ink/55">
-                {PRODUCT_LABELS[selectedApp.product] ?? selectedApp.product} · {fmtBRL(selectedApp.asset_value)} · {selectedApp.application_id}
+          ) : (
+            <div className="flex flex-col gap-3.5">
+              <button onClick={() => setSelectedId(null)} className="self-start border-none bg-transparent text-[11.5px] font-bold uppercase tracking-[0.05em] text-charcoal/55">← Fila de casos</button>
+              <div className="flex items-start justify-between gap-3 border-2 border-charcoal/40 p-[15px]">
+                <div>
+                  <div className="text-[16px] font-extrabold">{CUSTOMER_NAMES[selectedApp.customer_id] ?? selectedApp.customer_id}</div>
+                  <div className="mt-[3px] text-[12px] text-charcoal/55">
+                    {PRODUCT_LABELS[selectedApp.product] ?? selectedApp.product} · {fmtBRL(selectedApp.asset_value)}
+                  </div>
+                </div>
+                <div className="text-right font-mono text-[10px] leading-[1.5] text-charcoal/45">
+                  thread_id<br /><b className="text-charcoal">{selectedApp.application_id}</b>
+                </div>
+              </div>
+
+              {shownDecision && <DecisionCard decision={shownDecision} />}
+              <ScenarioTable scenarios={scenarios} />
+              {messages.length > 0 && <ChatThread messages={messages} onSend={sendAndReset} disabled={isStreaming} placeholder="Pedir recomendação ou contraproposta…" />}
+
+              <div className="flex flex-col gap-2.5 border border-charcoal/[0.25] bg-white p-3.5">
+                {pendingApproval ? (
+                  <>
+                    <div className="text-[11.5px] font-bold text-charcoal/70">
+                      Proposta do agente: <span className="text-forest">{OUTCOME_LABELS[pendingApproval.outcome] ?? pendingApproval.outcome}</span> — aguardando confirmação humana.
+                    </div>
+                    <p className="max-h-24 overflow-auto text-[12px] leading-relaxed text-charcoal/70">{pendingApproval.rationale}</p>
+                    <button onClick={confirmApproval} disabled={confirming} className="border-none bg-spring py-3 text-[13px] font-extrabold text-ink disabled:opacity-50">
+                      {confirming ? 'Confirmando…' : 'Confirmar ' + (OUTCOME_LABELS[pendingApproval.outcome] ?? pendingApproval.outcome)}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap gap-1.5">
+                      {LEVERS.map((l) => (
+                        <button key={l.key} disabled={isStreaming} onClick={() => runLever(l.key)} className="border border-charcoal/30 bg-white px-3 py-1.5 text-[11.5px] font-semibold disabled:opacity-40">
+                          {l.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex gap-2.5 border-t border-charcoal/[0.18] pt-2.5">
+                      <button onClick={() => stateVerdict('approved')} disabled={isStreaming} className="flex-1 border-none bg-spring py-3 text-left text-[13px] font-extrabold text-ink disabled:opacity-50">Aprovar</button>
+                      <button onClick={() => stateVerdict('denied')} disabled={isStreaming} className="flex-1 border border-charcoal/40 bg-transparent py-3 text-left text-[13px] font-bold text-charcoal disabled:opacity-50">Reprovar</button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
-
-            {shownDecision && <DecisionCard decision={shownDecision} />}
-            <ScenarioTable scenarios={scenarios} />
-            {messages.length > 0 && <ChatThread messages={messages} onSend={send} disabled={isStreaming} placeholder="Pedir recomendação ou contraproposta…" />}
-
-            <div className="flex flex-col gap-2.5 border border-ink/[0.14] p-3.5">
-              {pendingApproval ? (
-                <>
-                  <div className="text-[11.5px] font-bold text-ink/70">
-                    Proposta do agente: <span className="text-forest">{OUTCOME_LABELS[pendingApproval.outcome] ?? pendingApproval.outcome}</span> — aguardando confirmação humana.
-                  </div>
-                  <p className="max-h-24 overflow-auto text-[12px] leading-relaxed text-ink/70">{pendingApproval.rationale}</p>
-                  <button onClick={confirmApproval} disabled={confirming} className="bg-spring py-3 text-[13px] font-extrabold text-ink disabled:opacity-50">
-                    {confirming ? 'Confirmando…' : 'Confirmar ' + (OUTCOME_LABELS[pendingApproval.outcome] ?? pendingApproval.outcome)}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div className="flex flex-wrap gap-1.5">
-                    {LEVERS.map((l) => (
-                      <button key={l.key} disabled={isStreaming} onClick={() => runLever(l.key)} className="border border-ink/20 px-3 py-1.5 text-[11.5px] font-semibold disabled:opacity-40">
-                        {l.label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex gap-2.5 border-t border-ink/10 pt-2.5">
-                    <button onClick={() => stateVerdict('approved')} disabled={isStreaming} className="flex-1 bg-spring py-3 text-[13px] font-extrabold text-ink disabled:opacity-50">Aprovar</button>
-                    <button onClick={() => stateVerdict('denied')} disabled={isStreaming} className="flex-1 border border-ink/30 py-3 text-[13px] font-bold disabled:opacity-50">Reprovar</button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-      <div className="w-1/2"><TracePanel trace={trace} /></div>
-    </div>
+          )}
+        </div>
+      }
+      right={
+        <RightPane
+          persona="analyst"
+          trace={trace}
+          isStreaming={isStreaming}
+          replay={replay}
+          focus={focus}
+          onOpenNode={(id) => {
+            setFocus({ nodeId: id });
+            setDrawer({ kind: 'node', id });
+          }}
+          onOpenRow={(event, groupLabel) => {
+            setFocus({ nodeId: laneCardId(event), event });
+            setDrawer({ kind: 'row', event, groupLabel });
+          }}
+          onReplay={(label, rows) => {
+            setFocus(null);
+            startReplay(label, rows);
+          }}
+        />
+      }
+      drawer={<Drawer state={drawer} onClose={() => setDrawer(null)} />}
+    />
   );
 }

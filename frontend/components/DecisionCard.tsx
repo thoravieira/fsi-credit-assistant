@@ -12,26 +12,31 @@ export function DecisionCard({ decision }: { decision: Decision }) {
   const ok = decision.outcome === 'auto_approved' || decision.outcome.startsWith('approved');
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl bg-white p-4 shadow-[0_10px_26px_rgba(0,30,43,0.09)]">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-extrabold text-ink">Resultado</span>
-        <span className={'rounded-full px-3 py-1 text-[11px] font-extrabold ' + (ok ? 'bg-spring/[0.15] text-forest' : 'bg-ink/[0.08] text-ink')}>
-          {OUTCOME_LABELS[decision.outcome] ?? decision.outcome}
+    <div className="flex flex-col gap-3 border border-[rgba(0,30,43,0.16)] bg-white p-4">
+      <div className="flex items-center gap-[9px]">
+        <span className="flex h-[26px] w-[26px] flex-none items-center justify-center" style={{ background: ok ? '#00ED64' : 'rgba(32,30,29,.1)' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={ok ? '#001E2B' : '#201e1d'} strokeWidth="2.4" strokeLinecap="round">
+            {ok ? <path d="M20 6 9 17l-5-5" /> : <path d="M6 6l12 12M18 6 6 18" />}
+          </svg>
         </span>
+        <div>
+          <div className="text-[14px] font-bold text-ink">{OUTCOME_LABELS[decision.outcome] ?? decision.outcome}</div>
+          <div className="text-[11px] text-ink/50">Resultado</div>
+        </div>
       </div>
 
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-[7px]">
         {decision.reasons?.map((r, i) => (
-          <p key={i} className="flex gap-1.5 text-[12.5px] leading-relaxed text-ink/75">
-            <span className="text-forest">—</span>{r}
+          <p key={i} className="flex gap-2 text-[12.5px] leading-relaxed text-ink/72">
+            <span className="text-forest">•</span>{r}
           </p>
         ))}
         {decision.rationale && !decision.reasons?.length && (
-          <p className="text-[12.5px] leading-relaxed text-ink/75">{decision.rationale}</p>
+          <p className="text-[12.5px] leading-relaxed text-ink/72">{decision.rationale}</p>
         )}
         {decision.conditions?.map((c, i) => (
-          <p key={'c' + i} className="flex gap-1.5 text-[12.5px] leading-relaxed text-ink/75">
-            <span className="text-forest">—</span>Condição: {c}
+          <p key={'c' + i} className="flex gap-2 text-[12.5px] leading-relaxed text-ink/72">
+            <span className="text-forest">•</span>Condição: {c}
           </p>
         ))}
       </div>
@@ -44,12 +49,12 @@ export function DecisionCard({ decision }: { decision: Decision }) {
             <div key={id}>
               <button
                 onClick={() => setExpanded((s) => ({ ...s, [id]: !s[id] }))}
-                className={'rounded-full border border-forest px-2.5 py-1 text-[10.5px] font-bold ' + (isOpen ? 'bg-forest text-white' : 'bg-forest/10 text-forest')}
+                className={'border border-forest px-[11px] py-[5px] text-[10.5px] font-bold ' + (isOpen ? 'bg-forest text-white' : 'bg-[rgba(0,104,74,0.1)] text-forest')}
               >
                 {id}
               </button>
               {isOpen && pol && (
-                <div className="mt-1.5 rounded-lg bg-[#F1F2F4] p-2.5 text-[11.5px] leading-relaxed text-ink/75">
+                <div className="mt-[7px] bg-[#F1F2F1] p-3 text-[11.5px] leading-[1.55] text-ink/72">
                   <b className="text-ink">{pol.title}</b>
                   <br />
                   {pol.body}
