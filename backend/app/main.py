@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from typing import AsyncIterator, Literal
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessageChunk, HumanMessage
 from langgraph.types import Command
@@ -53,6 +54,18 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="FSI Credit Assistant", lifespan=lifespan)
+
+# The frontend (SDD 12) is a separate Next.js origin — localhost:3000 talking
+# to localhost:8000 is cross-origin by the browser's same-origin rule (port
+# differs), so `/api/chat`'s `fetch()` is silently rejected without this.
+# Demo has no auth and no cookies, so an explicit origin allowlist without
+# credentials is enough; it does not need to be locked down further.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def _new_application_id() -> str:
@@ -214,7 +227,6 @@ async def stream_chat_events(
 
     t_prev = time.perf_counter()
     pending_detail: dict = {}
-    final_state: dict = {}
 
     async for mode, chunk in graph.astream(
         payload, config=config, stream_mode=["updates", "messages", "custom"]
@@ -262,9 +274,6 @@ async def stream_chat_events(
                     event["detail"] = pending_detail
                     pending_detail = {}
                 yield _sse("trace", event)
-
-                if update:
-                    final_state.update(update)
         elif mode == "messages":
             message_chunk, meta = chunk
             if not _is_customer_facing_token(message_chunk, meta):
@@ -273,13 +282,21 @@ async def stream_chat_events(
             if text:
                 yield _sse("token", {"text": text})
 
+    # Read the checkpoint rather than replaying the `updates` deltas: `scenarios`
+    # is an `operator.add` field (SDD 04 §2), so a node's own delta is only
+    # what *that turn* contributed, never the accumulated thread total.
+    # `calc`/`decision`/`pending_approval`/`stage` use plain overwrite
+    # semantics, so the checkpoint agrees with the last delta for those either
+    # way — one read after the loop is simpler and correct for both kinds.
+    final_values = (await graph.aget_state(config)).values
     yield _sse(
         "state",
         {
-            "stage": final_state.get("stage"),
-            "calc": final_state.get("calc"),
-            "decision": final_state.get("decision"),
-            "pending_approval": final_state.get("pending_approval"),
+            "stage": final_values.get("stage"),
+            "calc": final_values.get("calc"),
+            "decision": final_values.get("decision"),
+            "pending_approval": final_values.get("pending_approval"),
+            "scenarios": final_values.get("scenarios"),
         },
     )
     yield _sse("done", {"thread_id": thread_id})

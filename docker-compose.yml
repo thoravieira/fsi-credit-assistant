@@ -1,0 +1,25 @@
+# Local verification for both services (SDD 14 §1). MongoDB itself is not a
+# service here: the demo runs against the real Atlas M10 cluster seeded in
+# Session 2 (MONGODB_URI in .env) — CLAUDE.md's "MongoDB Atlas as the single
+# data plane" — not a fresh local Mongo container that would need re-seeding
+# and would diverge from the cluster the demo script and rehearsals use.
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: ../Dockerfile.api
+    env_file:
+      - ./.env
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: ../Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api

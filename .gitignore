@@ -18,5 +18,6 @@ __pycache__/
 node_modules/
 .next/
 dist/
+*.tsbuildinfo
 
 .DS_Store

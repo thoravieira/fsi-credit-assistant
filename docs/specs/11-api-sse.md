@@ -42,15 +42,21 @@ event: token
 data: {"text":"Com entrada de 30%"}
 
 event: state
-data: {"stage":"negotiation","calc":{...},"decision":{...},"pending_approval":null}
+data: {"stage":"negotiation","calc":{...},"decision":{...},"pending_approval":null,"scenarios":[...]}
 
 event: done
 data: {"thread_id":"APP-20260814-0001"}
 ```
 
 The `state` event is emitted **once, immediately before `done`**, carrying the final
-`stage` / `calc` / `decision` / `pending_approval`. Emitting it per node would make the UI
-flicker through intermediate states that were never real conclusions.
+`stage` / `calc` / `decision` / `pending_approval` / `scenarios`. Emitting it per node would
+make the UI flicker through intermediate states that were never real conclusions.
+
+`scenarios` is `AgentState["scenarios"]` (SDD 04 §2) verbatim — every structure
+`recalculate_scenario` evaluated on the thread so far, accumulated via `operator.add`
+across negotiation turns. `ScenarioTable` (SDD 12 §1) renders from this array; it is not
+reconstructed from `trace` events, whose `step: "recalculate_scenario"` detail is a partial
+6-field summary for the live trace panel, not the full scenario dict.
 
 ### Two further `trace` statuses, both from the analyst path
 
