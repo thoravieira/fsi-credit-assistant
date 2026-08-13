@@ -113,6 +113,10 @@ export default function ConsolePage() {
   // would show a stale approved decision after the customer re-simulates on
   // the same thread and it comes back denied (found live, see memory).
   const shownDecision = decision ?? (selectedApp ? currentDecisionOf(selectedApp) : null);
+  // Item 10 — a case already resolved (Aprovados/Reprovações tabs) can't be
+  // decided again; the backend mirrors this (`negotiation.py` never sets
+  // `pending_approval` once `application.status` leaves `manual_review`).
+  const alreadyDecided = !!selectedApp?.status && selectedApp.status !== 'manual_review' && selectedApp.status !== 'auto_approved';
 
   const stateVerdict = (outcome: 'approved' | 'denied') => {
     sendAndReset(outcome === 'approved' ? 'Aprovar a proposta apresentada.' : 'Reprovar a proposta, não seguir com o crédito.');
@@ -195,9 +199,14 @@ export default function ConsolePage() {
                   </>
                 ) : (
                   <>
+                    {alreadyDecided && (
+                      <div className="text-[11.5px] font-bold text-charcoal/70">
+                        Decisão já registrada: <span className="text-forest">{OUTCOME_LABELS[selectedApp.status ?? ''] ?? selectedApp.status}</span>. O chat acima pode ser usado para simular cenários e entender a decisão, mas não altera o resultado.
+                      </div>
+                    )}
                     <div className="flex gap-2.5">
-                      <button onClick={() => stateVerdict('approved')} disabled={isStreaming} className="flex-1 border-none bg-spring py-3 text-center text-[13px] font-extrabold text-ink disabled:opacity-50">Aprovar</button>
-                      <button onClick={() => stateVerdict('denied')} disabled={isStreaming} className="flex-1 border border-charcoal/40 bg-transparent py-3 text-center text-[13px] font-bold text-charcoal disabled:opacity-50">Reprovar</button>
+                      <button onClick={() => stateVerdict('approved')} disabled={isStreaming || alreadyDecided} title={alreadyDecided ? 'Este caso já foi decidido' : undefined} className="flex-1 border-none bg-spring py-3 text-center text-[13px] font-extrabold text-ink disabled:opacity-50">Aprovar</button>
+                      <button onClick={() => stateVerdict('denied')} disabled={isStreaming || alreadyDecided} title={alreadyDecided ? 'Este caso já foi decidido' : undefined} className="flex-1 border border-charcoal/40 bg-transparent py-3 text-center text-[13px] font-bold text-charcoal disabled:opacity-50">Reprovar</button>
                     </div>
                   </>
                 )}

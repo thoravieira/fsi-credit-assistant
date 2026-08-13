@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ChatMessage } from '../hooks/useAgentStream';
 import { Markdown } from '../lib/markdown';
 import { DecisionCard } from './DecisionCard';
@@ -28,21 +28,36 @@ export function ChatMessages({
   onContract,
   suggestions,
   onSuggestion,
+  highlightMessageId,
 }: {
   messages: ChatMessage[];
   onContract?: (m: ChatMessage) => void;
   suggestions?: Suggestion[];
   onSuggestion?: (prompt: string) => void;
+  // Customer journey only (item 4): the analyst/decision notification bell
+  // scrolls to and briefly pulses the message carrying the approval/rejection,
+  // reusing `.animate-card-pulse` rather than a bespoke highlight style.
+  highlightMessageId?: string | null;
 }) {
   const lastId = messages[messages.length - 1]?.id;
   const lastStreaming = messages[messages.length - 1]?.streaming;
+  const highlightRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (highlightMessageId) highlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [highlightMessageId]);
 
   return (
     <div className="flex flex-col gap-2.5">
       {messages.map((m) => {
         const positive = m.decision && POSITIVE_OUTCOMES.has(m.decision.outcome);
+        const highlighted = m.id === highlightMessageId;
         return (
-          <div key={m.id} className="flex flex-col gap-1.5">
+          <div
+            key={m.id}
+            ref={highlighted ? highlightRef : undefined}
+            className={'flex flex-col gap-1.5' + (highlighted ? ' animate-card-pulse' : '')}
+          >
             <div className={'flex ' + (m.role === 'user' ? 'justify-end' : 'justify-start')}>
               <div className={'max-w-[86%] px-3.5 py-2.5 text-[13px] leading-relaxed ' + (m.role === 'user' ? 'bg-ink text-white' : 'bg-white text-ink')}>
                 {m.role === 'assistant' ? <Markdown text={m.text} /> : m.text}
@@ -87,7 +102,7 @@ export function ChatMessages({
 }
 
 export function ChatInputBar({
-  onSend, disabled, placeholder = 'Escreva uma mensagem…', prefill,
+  onSend, disabled, placeholder = 'Escreva uma mensagem…', prefill, large,
 }: {
   onSend: (text: string) => void;
   disabled?: boolean;
@@ -97,6 +112,10 @@ export function ChatInputBar({
   // call to `onSend`. `nonce` forces the effect even when the same suggestion
   // is clicked twice in a row.
   prefill?: { text: string; nonce: number } | null;
+  // Item 11 — customer journey only: a taller, multi-line composer with
+  // Enviar anchored bottom-right, instead of the analyst console's compact
+  // single-line input.
+  large?: boolean;
 }) {
   const [text, setText] = useState('');
   const submit = (value?: string) => {
@@ -113,6 +132,30 @@ export function ChatInputBar({
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fires only on a new prefill, not on every `disabled`/`text` change
   }, [prefill?.nonce]);
+
+  if (large) {
+    return (
+      <div className="flex items-end gap-2">
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+          disabled={disabled}
+          placeholder={placeholder}
+          rows={3}
+          className="min-h-[72px] flex-1 resize-none border border-[rgba(0,30,43,0.2)] bg-white px-4 py-3 text-[13px] outline-none focus:border-forest disabled:opacity-60"
+        />
+        <button onClick={() => submit()} disabled={disabled} className="self-end border-none bg-ink px-4 py-3 text-[12.5px] font-bold text-white disabled:opacity-40">
+          Enviar
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex gap-2">

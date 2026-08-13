@@ -82,7 +82,7 @@ export const NODES: Record<string, NodeInfo> = {
     usage: { file: 'backend/app/graph/builder.py', lines: [44, 44] },
   },
   intake: {
-    label: 'intake', sub: 'entende o pedido', chips: ['chain', 'openai', 'short'],
+    label: 'customer_input', sub: 'entende o pedido', chips: ['chain', 'openai', 'short'],
     what: 'LangChain com structured output transforma texto livre em CreditApplication tipada. Campo faltando não vira None no cálculo: o grafo desvia e pergunta.',
     rows: [['Camada', 'LangChain'], ['Modelo', 'OpenAI · structured output'], ['Memória', 'checkpoint (curta)'], ['Tokens', '312 in · 88 out']],
     sample: '{"product":"mortgage","asset_value":400000,\n "down_payment":100000,"term_months":360}',
@@ -91,7 +91,7 @@ export const NODES: Record<string, NodeInfo> = {
     usage: { file: 'backend/app/graph/builder.py', lines: [45, 45] },
   },
   load_context: {
-    label: 'load_context', sub: 'perfil e memória', chips: ['mongo', 'long', 'short'],
+    label: 'retrieval_memory', sub: 'perfil e memória', chips: ['mongo', 'long', 'short'],
     what: 'Lê customer_profiles (Collections) e o MongoDBStore (memória longa, 3 namespaces). O checkpoint da conversa (memória curta) já foi restaurado pelo LangGraph antes do nó rodar.',
     rows: [['Camada', 'LangGraph'], ['Mem. curta', 'checkpoints · TTL 24 h · MongoDBSaver'], ['Mem. longa', 'agent_memories · MongoDBStore'], ['Namespaces', '("customer",id,"preferences") · ("...","facts") · ("analyst",id,"decision_patterns")']],
     sample: '{"content":"Prioriza parcela menor sobre prazo curto",\n "observed_at":"2026-05-02T13:07:00Z"}',
@@ -100,7 +100,7 @@ export const NODES: Record<string, NodeInfo> = {
     usage: { file: 'backend/app/graph/builder.py', lines: [46, 46] },
   },
   policy_retrieval: {
-    label: 'policy_retrieval', sub: 'busca a política (RAG)', chips: ['embed', 'vector'],
+    label: 'retrieval_policies', sub: 'busca a política (RAG)', chips: ['embed', 'vector'],
     what: 'É aqui que a pergunta vira vetor: o texto da consulta passa pelo modelo de embeddings (Voyage, 1024d) e o vetor entra num $vectorSearch em credit_policies, com pre_filter por produto, k=4.',
     rows: [['Camada', 'LangChain + MongoDB'], ['Embeddings', 'voyage-4-lite · 1024d'], ['Operação', '$vectorSearch · credit_policies · k=4 · cosine'], ['Latência', 'embed 120 ms + busca 520 ms']],
     sample: '[{"_id":"POL-020","score":0.92,"title":"Alçadas de aprovação"},\n {"_id":"POL-004","score":0.88,"title":"DTI máximo"}]',
@@ -109,7 +109,7 @@ export const NODES: Record<string, NodeInfo> = {
     usage: { file: 'backend/app/graph/builder.py', lines: [47, 47] },
   },
   credit_calculator: {
-    label: 'credit_calculator', sub: 'calcula (Python puro)', chips: ['python'],
+    label: 'risk_calc', sub: 'calcula (Python puro)', chips: ['python'],
     what: 'PMT pela Tabela Price, CET por bisseção, LTV e DTI em Python puro — zero chamada de LLM. O modelo escolhe o cenário; este módulo avalia. É a resposta para "como você impede a alucinação de número".',
     rows: [['Camada', 'domain/calculator.py'], ['Modelo', 'nenhum — 0 LLM'], ['Taxa mensal', '(1+anual)^(1/12) − 1 (efetiva)'], ['Latência', '< 10 ms']],
     sample: '{"monthly_payment":2658.78,"ltv":0.75,"dti":0.358,\n "annual_rate":0.106,"cet_annual":0.1113}',
@@ -118,7 +118,7 @@ export const NODES: Record<string, NodeInfo> = {
     usage: { file: 'backend/app/graph/builder.py', lines: [48, 48] },
   },
   decision: {
-    label: 'decision', sub: 'aplica as regras', chips: ['python', 'mongo'],
+    label: 'decision_analysis', sub: 'aplica as regras', chips: ['python', 'mongo'],
     what: 'domain/rules.py aplica a matriz de limites por produto e devolve outcome, policy_refs e reasons em português. Grava o assessment em decisions_log e atualiza applications.',
     rows: [['Camada', 'domain/rules.py'], ['Saídas', 'auto_approved · manual_review · denied'], ['Escreve', 'decisions_log · applications.status']],
     sample: '{"outcome":"manual_review","policy_refs":["POL-020","POL-004"],\n "breached_rules":["ltv_auto_approval_limit","dti_auto_approval_limit"]}',
@@ -127,7 +127,7 @@ export const NODES: Record<string, NodeInfo> = {
     usage: { file: 'backend/app/graph/builder.py', lines: [49, 49] },
   },
   customer_response: {
-    label: 'customer_response', sub: 'responde à cliente', chips: ['chain', 'openai'],
+    label: 'customer_output', sub: 'responde à cliente', chips: ['chain', 'openai'],
     what: 'O LLM escreve a resposta em português ancorado em policies + calc que já estão no estado. Os tokens chegam por streaming. O modelo descreve números, nunca os calcula.',
     rows: [['Camada', 'LangChain'], ['Modelo', 'OpenAI · chat completions (stream)'], ['Tokens', '~420 in · 96 out']],
     sample: '"Com entrada de R$ 100.000, a parcela fica em R$ 2.658,78 — LTV de 75,0%…"',
@@ -203,7 +203,7 @@ export const NODES: Record<string, NodeInfo> = {
   // distinct top-level graph nodes — these two cards group them by lane for
   // the swimlane view (see SUBSTEP_TO_CARD) without inventing a fake node.
   scenario_tools: {
-    label: 'ferramentas de cenário', sub: 'recalculate_scenario', chips: ['deep', 'python'],
+    label: 'scenario_tools', sub: 'recalculate_scenario', chips: ['deep', 'python'],
     what: 'A negociação chama esta ferramenta para recalcular PMT/LTV/DTI com um novo down_payment ou term_months — o mesmo domain/calculator.py determinístico do credit_calculator, exposto como tool ao deep agent.',
     rows: [['Camada', 'Deep Agents · tool'], ['Chamada por', 'negotiation'], ['Código', 'domain/calculator.py — mesma função do credit_calculator']],
     sample: '{"down_payment":140000,"term_months":360} → {"ltv":0.65,"dti":0.314}',
@@ -212,7 +212,7 @@ export const NODES: Record<string, NodeInfo> = {
     usage: { file: 'backend/app/agent/negotiation.py', lines: [69, 69] },
   },
   research_tools: {
-    label: 'pesquisa (RAG)', sub: 'policy_researcher · precedent_analyst', chips: ['deep', 'vector'],
+    label: 'retrieval_search', sub: 'policy_researcher · precedent_analyst', chips: ['deep', 'vector'],
     what: 'Os subagentes de contexto isolado — política, precedentes e (quando pedido) Open Finance — chamados sob demanda pela negociação, cada um com seu próprio $vectorSearch ou consulta externa.',
     rows: [['Camada', 'Deep Agents · subagentes'], ['Coleções', 'credit_policies · historical_cases'], ['Isolamento', 'contexto próprio por subagente']],
     sample: '"DTI de 31,4% permitido em análise manual com fator compensatório (POL-004, POL-016)."',
@@ -231,22 +231,22 @@ interface TrackMeta {
 
 export const TRACK_META: Record<string, TrackMeta> = {
   api: { short: 'SSE', kind: 'io', tech: 'stream', in: 'POST /api/chat · {persona, message}' },
-  scenario_tools: { short: 'scenario tools', kind: 'code', tech: 'Python', in: 'down_payment · term_months' },
-  research_tools: { short: 'research tools', kind: 'rag', tech: 'Deep Agents', in: 'pergunta isolada · contexto próprio' },
-  router: { short: 'router', kind: 'code', tech: 'Python', in: '{persona, stage}' },
-  intake: { short: 'intake', kind: 'llm', tech: 'OpenAI', in: 'texto livre da cliente' },
-  load_context: { short: 'context', kind: 'data', tech: 'MongoDB', in: 'thread_id · customer_id' },
-  policy_retrieval: { short: 'policy RAG', kind: 'rag', tech: 'Voyage · Atlas', in: 'embed(consulta) · 1024d' },
-  credit_calculator: { short: 'calculator', kind: 'code', tech: 'Python', in: 'valor · entrada · prazo' },
-  decision: { short: 'decision', kind: 'code', tech: 'Python · Mongo', in: 'calc + políticas' },
-  customer_response: { short: 'response', kind: 'llm', tech: 'OpenAI', in: 'calc + políticas + memórias' },
-  precedent_search: { short: 'cases RAG', kind: 'rag', tech: 'Voyage · Atlas', in: 'embed(resumo do caso)' },
-  analyst_brief: { short: 'brief', kind: 'llm', tech: 'OpenAI', in: 'calc + políticas + precedentes' },
+  scenario_tools: { short: 'scenario tools', kind: 'code', tech: 'PyFunc', in: 'down_payment · term_months' },
+  research_tools: { short: 'research tools', kind: 'rag', tech: 'Atlas', in: 'pergunta isolada · contexto próprio' },
+  router: { short: 'router', kind: 'code', tech: 'LangGraph', in: '{persona, stage}' },
+  intake: { short: 'intake', kind: 'llm', tech: 'LLM', in: 'texto livre da cliente' },
+  load_context: { short: 'context', kind: 'data', tech: 'Atlas', in: 'thread_id · customer_id' },
+  policy_retrieval: { short: 'policy RAG', kind: 'rag', tech: 'Atlas', in: 'embed(consulta) · 1024d' },
+  credit_calculator: { short: 'calculator', kind: 'code', tech: 'PyFunc', in: 'valor · entrada · prazo' },
+  decision: { short: 'decision', kind: 'code', tech: 'PyFunc', in: 'calc + políticas' },
+  customer_response: { short: 'response', kind: 'llm', tech: 'LLM', in: 'calc + políticas + memórias' },
+  precedent_search: { short: 'cases RAG', kind: 'rag', tech: 'Atlas', in: 'embed(resumo do caso)' },
+  analyst_brief: { short: 'brief', kind: 'llm', tech: 'LLM', in: 'calc + políticas + precedentes' },
   negotiation: { short: 'negotiation', kind: 'llm', tech: 'Deep Agents', in: 'pedido do analista + estado' },
   policy_researcher: { short: 'policy sub', kind: 'rag', tech: 'subagente', in: 'pergunta isolada · contexto próprio' },
   precedent_analyst: { short: 'cases sub', kind: 'rag', tech: 'subagente', in: 'pergunta isolada · contexto próprio' },
-  await_approval: { short: 'approval', kind: 'io', tech: 'humano', in: 'decisão do analista' },
-  persist_decision: { short: 'persist', kind: 'data', tech: 'MongoDB', in: 'assessment + trace' },
+  await_approval: { short: 'approval', kind: 'io', tech: 'LangGraph', in: 'decisão do analista' },
+  persist_decision: { short: 'persist', kind: 'data', tech: 'Atlas', in: 'assessment + trace' },
 };
 
 export const TRACK_CUST = ['api', 'router', 'intake', 'load_context', 'policy_retrieval', 'credit_calculator', 'decision', 'customer_response'];

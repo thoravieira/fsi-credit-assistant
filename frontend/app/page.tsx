@@ -19,6 +19,18 @@ import type { Product } from '../lib/api';
 // R$ 11.200, dívida existente R$ 1.350, score interno 782 (SDD 16 §2).
 const CUSTOMER_ID = 'CUST-0001';
 
+// Item 4 — "has the customer already seen the current decision" persisted
+// per thread, so the bell rings again only for a *new* analyst decision, not
+// on every reopen of an already-seen one. `status + updated_at` is a cheap
+// version marker: both change whenever `decision`/`persist_decision` write a
+// new outcome, and neither is exposed as a dedicated id today.
+function decisionSeenKey(threadId: string) {
+  return `credit-assistant:decision-seen:${threadId}`;
+}
+function decisionMarker(app: { status?: string; updated_at?: string }) {
+  return `${app.status ?? ''}@${app.updated_at ?? ''}`;
+}
+
 // Per-product defaults so switching the picker lands on sane numbers instead
 // of e.g. a R$400k "veículo" — SDD 16 §2 only seeds a mortgage profile for
 // CUST-0001, so auto is a real product (POL-002/003/005/009/019/021) simulated
@@ -63,6 +75,8 @@ export default function CustomerPage() {
   const [drawer, setDrawer] = useState<DrawerState>(null);
   const [focus, setFocus] = useState<FocusState | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [hasUnreadDecision, setHasUnreadDecision] = useState(false);
+  const [highlightMessageId, setHighlightMessageId] = useState<string | null>(null);
 
   // `thread_id == application_id` (SDD 04 §1). No localStorage: the screen
   // always opens on the simulation form (below), and the only thing this
@@ -102,6 +116,26 @@ export default function CustomerPage() {
   }, []);
 
   const { trace, messages, decision, isStreaming, send, hydrate, markContracted } = useAgentStream(threadId ?? '', 'customer');
+
+  // Item 4 — check once per thread load whether the analyst's current
+  // decision is one this browser hasn't marked "seen" yet. Deliberately a
+  // lightweight `getApplication` here, not a full `openHistory()`: this must
+  // not itself open the chat or flip `formOpen`, it only decides whether the
+  // bell should ring.
+  useEffect(() => {
+    if (!threadId) return;
+    let cancelled = false;
+    getApplication(threadId).then((app) => {
+      if (cancelled) return;
+      const current = currentDecisionOf(app);
+      if (current && decisionMarker(app) !== localStorage.getItem(decisionSeenKey(threadId))) {
+        setHasUnreadDecision(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [threadId]);
   const { replay, start: startReplay } = useReplay();
   const financed = previewFinanced(assetValue, downPayment);
   const ltv = previewLtv(assetValue, downPayment);
@@ -133,17 +167,38 @@ export default function CustomerPage() {
   // on an already-approved thread). Always fetched fresh from MongoDB, never
   // cached: this is the one place stale state used to leak back in.
   const openHistory = async () => {
-    if (!threadId || historyLoading) return;
+    if (!threadId || historyLoading) return null;
     setHistoryLoading(true);
     try {
       const [pastMessages, app] = await Promise.all([getHistory(threadId), getApplication(threadId)]);
       const chatMessages: ChatMessage[] = pastMessages.map((m, i) => ({ id: 'h-' + i, role: m.role, text: m.text }));
-      hydrate({ messages: chatMessages, decision: currentDecisionOf(app) });
+      const decision = currentDecisionOf(app);
+      hydrate({ messages: chatMessages, decision });
       setFocus(null);
       setDrawer(null);
       setFormOpen(false);
+      // Same best-effort attachment `hydrate()` uses internally (SDD 12
+      // follow-up): a past decision has no id of its own, so "the message
+      // carrying it" is the last assistant turn, once one exists.
+      const lastAssistantIdx = chatMessages.reduce((acc, m, i) => (m.role === 'assistant' ? i : acc), -1);
+      return { app, decisionMessageId: decision && lastAssistantIdx >= 0 ? chatMessages[lastAssistantIdx].id : null };
     } finally {
       setHistoryLoading(false);
+    }
+  };
+
+  // Item 4 — clicking the bell: stop the animation, remember this decision as
+  // seen (so it doesn't ring again on the next reopen), and jump to the exact
+  // message that carries the approval/rejection.
+  const handleBellClick = async () => {
+    if (!threadId) return;
+    setHasUnreadDecision(false);
+    const result = await openHistory();
+    if (!result) return;
+    localStorage.setItem(decisionSeenKey(threadId), decisionMarker(result.app));
+    if (result.decisionMessageId) {
+      setHighlightMessageId(result.decisionMessageId);
+      setTimeout(() => setHighlightMessageId(null), 2500);
     }
   };
 
@@ -161,7 +216,14 @@ export default function CustomerPage() {
     <AppShell
       leftBg="#eae9e9"
       left={
-        <div className="flex flex-1 items-start justify-center overflow-auto p-5">
+        // Item 9 — `overflow-x` deliberately dropped: a horizontally
+        // scrollable flex-centered container is a well-known scroll trap
+        // (once the window was ever narrow enough to overflow, the browser
+        // does not reliably re-center scroll position as it widens again,
+        // so the phone would look pinned in place instead of tracking the
+        // window). The 390px phone comfortably fits 44% of any realistic
+        // demo window width, so there's nothing to trade off by removing it.
+        <div className="flex flex-1 items-start justify-center overflow-y-auto overflow-x-hidden p-5">
           <IOSDevice dark width={390} height={800}>
             <CustomerApp
               product={product}
@@ -189,6 +251,9 @@ export default function CustomerPage() {
               onSend={sendAndReset}
               decision={decision}
               onContract={onContract}
+              hasUnreadDecision={hasUnreadDecision}
+              onBellClick={handleBellClick}
+              highlightMessageId={highlightMessageId}
             />
           </IOSDevice>
         </div>

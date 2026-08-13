@@ -1,14 +1,24 @@
-"""SDD 02 + 08 — seed customer_profiles, credit_policies, historical_cases.
+"""SDD 02 + 08 — seed customer_profiles, credit_policies, historical_cases,
+applications and decisions_log.
 
 Idempotent: upserts by `_id`, so re-running leaves the same document count.
 Embeddings are only recomputed when the source text changed or --reembed is
 passed, to avoid needless embedding-API calls on every re-run.
+
+`applications`/`decisions_log` are seeded from `data/applications/applications_seed.json`
+using the exact production domain code (`compute_scenario`, `evaluate`, `append_event`) —
+no reimplementation, no LLM, no invented numbers. See `seed_applications` below.
+
+--reset wipes every collection that holds nothing but reproducible fixtures or
+live-demo-day data (which by definition doesn't exist before the demo), then runs
+the normal seed flow — a full, reproducible rebuild. See `reset_demo_data` below.
 """
 
 import argparse
 import hashlib
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -16,12 +26,35 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import yaml
 from pymongo import ReplaceOne
 
-from app.config import get_settings
+from app.audit import append_event
+from app.config import DEMO_ANALYST_ID, get_settings
 from app.db import get_client
+from app.domain.calculator import compute_scenario
+from app.domain.rules import evaluate
 from app.embeddings import get_embeddings
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = REPO_ROOT / "data"
+
+# APP-SEED-NNNN, never APP-YYYYMMDD-NNNN — that live-application format is
+# reserved for real applications created through the API on demo day, and
+# must never collide with these seed records.
+SEED_APPLICATION_IDS = [f"APP-SEED-{i:04d}" for i in range(1, 51)]
+
+# Collections that hold nothing but reproducible fixtures or live-demo-day
+# data (which doesn't exist yet before the demo) — safe to wipe unconditionally
+# under --reset. `historical_cases` is handled separately: only the
+# agent-derived precedent cases (written live by `persist_decision.py`, tagged
+# with `source_application_id`) are removed, leaving the ~60 authored seed
+# cases from `data/cases/cases.json` untouched.
+RESET_WIPE_COLLECTIONS = [
+    "applications",
+    "decisions_log",
+    "checkpoints",
+    "checkpoint_writes",
+    "trace_log",
+    "agent_memories",
+]
 
 
 def content_hash(text: str) -> str:
@@ -45,6 +78,12 @@ def load_cases() -> list[dict]:
 
 def load_profiles() -> list[dict]:
     return json.loads((DATA_DIR / "profiles" / "profiles.json").read_text(encoding="utf-8"))
+
+
+def load_applications() -> list[dict]:
+    return json.loads(
+        (DATA_DIR / "applications" / "applications_seed.json").read_text(encoding="utf-8")
+    )
 
 
 def seed_embedded_collection(
@@ -89,10 +128,146 @@ def seed_profiles(coll, docs: list[dict]) -> None:
     )
 
 
+def seed_applications(db, profiles_by_id: dict[str, dict]) -> None:
+    """Seed ~50 `applications` + their `decisions_log` events from
+    `data/applications/applications_seed.json`.
+
+    Every `calc`/`decision` is produced by the real `compute_scenario` /
+    `evaluate` domain functions run against the real seeded profile — the
+    same functions the graph itself calls (`decision.py`, `scenario.py`).
+    `status` is always `result["outcome"]`; nothing here fakes an outcome
+    independent of what the domain code actually returns.
+
+    Idempotent: `applications` upserts by `_id`; `decisions_log` is cleared
+    for these seed application ids first, then re-appended fresh, so
+    re-running never accumulates duplicate log entries.
+    """
+    specs = load_applications()
+
+    db["decisions_log"].delete_many({"application_id": {"$in": SEED_APPLICATION_IDS}})
+
+    ops = []
+    resolved_count = 0
+    for spec in specs:
+        application_id = spec["_id"]
+        profile = profiles_by_id[spec["customer_id"]]
+        product = spec["product"]
+        asset_value = spec["asset_value"]
+        down_payment = spec["down_payment"]
+        term_months = spec["term_months"]
+        financed = asset_value - down_payment
+
+        calc = compute_scenario(
+            product=product,
+            asset_value=asset_value,
+            financed=financed,
+            term_months=term_months,
+            net_income=profile["income"]["net_monthly"],
+            existing_debt=profile["credit"]["existing_monthly_debt"],
+            score=profile["credit"]["internal_score"],
+        )
+        application = {
+            "product": product,
+            "requested_amount": financed,
+            "term_months": term_months,
+        }
+        decision = evaluate(application, calc, profile)
+
+        doc = {
+            "_id": application_id,
+            "thread_id": application_id,
+            "customer_id": spec["customer_id"],
+            "product": product,
+            "asset_value": asset_value,
+            "down_payment": down_payment,
+            "requested_amount": financed,
+            "term_months": term_months,
+            "purpose": spec["purpose"],
+            "status": decision["outcome"],
+            "created_at": datetime.fromisoformat(spec["created_at"]),
+            "updated_at": datetime.fromisoformat(spec["updated_at"]),
+            "latest_assessment": {"calc": calc, "decision": decision},
+        }
+
+        # Mirrors `decision.py`'s `assessment` event exactly — written on
+        # every path, including automatic approvals (SDD 02 §6).
+        append_event(
+            application_id,
+            "assessment",
+            {"type": "agent", "id": "system"},
+            calc=calc,
+            outcome=decision["outcome"],
+            policy_refs=decision["policy_refs"],
+            rationale=" ".join(decision["reasons"]),
+        )
+
+        resolution = spec.get("resolution")
+        if resolution is not None:
+            # Mirrors `persist_decision.py`'s `final_decision` event and
+            # `applications` update, minus the precedent/memory writes (out
+            # of scope for a seed script — those are agent-derived).
+            append_event(
+                application_id,
+                "final_decision",
+                {"type": "analyst", "id": DEMO_ANALYST_ID},
+                calc=calc,
+                outcome=resolution["outcome"],
+                policy_refs=resolution["policy_refs"],
+                precedent_refs=[],
+                conditions=resolution["conditions"],
+                rationale=resolution["rationale"],
+            )
+            doc["status"] = resolution["outcome"]
+            doc["final_decision"] = {
+                "outcome": resolution["outcome"],
+                "policy_refs": resolution["policy_refs"],
+                "rationale": resolution["rationale"],
+                "conditions": resolution["conditions"],
+                "precedent_refs": [],
+            }
+            resolved_count += 1
+
+        ops.append(ReplaceOne({"_id": application_id}, doc, upsert=True))
+
+    result = db["applications"].bulk_write(ops)
+    print(
+        f"  applications: {len(specs)} docs upserted "
+        f"(matched={result.matched_count}, upserted={len(result.upserted_ids or {})}), "
+        f"{resolved_count} resolved by analyst, {len(specs) - resolved_count} open/closed by system"
+    )
+
+
+def reset_demo_data(db) -> None:
+    """--reset: unconditional wipe of every collection that holds nothing but
+    reproducible fixtures or live-demo-day data, so the normal seed flow that
+    follows produces a fully reproducible pristine baseline.
+    """
+    print("## Resetting demo data")
+    for name in RESET_WIPE_COLLECTIONS:
+        result = db[name].delete_many({})
+        print(f"  {name}: deleted {result.deleted_count}")
+
+    # Only the agent-derived precedent cases written live by
+    # `persist_decision.py` (tagged with `source_application_id`) — the ~60
+    # authored seed cases from `data/cases/cases.json` are left untouched.
+    result = db["historical_cases"].delete_many({"source_application_id": {"$exists": True}})
+    print(f"  historical_cases (agent-derived precedents only): deleted {result.deleted_count}")
+    print()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--reembed", action="store_true", help="Force re-embedding of all policies and cases."
+    )
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help=(
+            "Wipe applications, decisions_log, checkpoints, checkpoint_writes, "
+            "trace_log, agent_memories, and agent-derived historical_cases before "
+            "seeding, for a fully reproducible pristine baseline."
+        ),
     )
     args = parser.parse_args()
 
@@ -101,8 +276,12 @@ def main() -> None:
     db = client[settings.mongodb_db]
     embeddings = get_embeddings()
 
+    if args.reset:
+        reset_demo_data(db)
+
     print("## Seeding customer_profiles")
-    seed_profiles(db["customer_profiles"], load_profiles())
+    profiles = load_profiles()
+    seed_profiles(db["customer_profiles"], profiles)
 
     print("## Seeding credit_policies")
     seed_embedded_collection(
@@ -113,6 +292,10 @@ def main() -> None:
     seed_embedded_collection(
         db["historical_cases"], load_cases(), "summary", embeddings, args.reembed
     )
+
+    print("## Seeding applications + decisions_log")
+    profiles_by_id = {p["_id"]: p for p in profiles}
+    seed_applications(db, profiles_by_id)
 
     print()
     print("Done.")

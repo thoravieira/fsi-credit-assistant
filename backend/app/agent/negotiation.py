@@ -47,7 +47,7 @@ from app.domain.formatting import brl, percent
 from app.graph.prompts import load_prompt
 from app.graph.state import AgentState
 from app.graph.tools.case import NegotiationCase
-from app.graph.tools.scenario import check_open_finance_assets, recalculate_scenario
+from app.graph.tools.scenario import check_open_finance_assets, recalculate_scenario, solve_for_target_dti
 from app.llm import get_chat_model
 from app.memory.store import get_store
 
@@ -56,9 +56,9 @@ from app.memory.store import get_store
 def get_negotiation_agent() -> CompiledStateGraph:
     """Built once per process, like the parent graph (SDD 04 §4).
 
-    The two tools listed here are the agent's own. `deepagents` also gives it a
-    virtual filesystem (`ls`, `read_file`, `write_file`, …) and the `task` tool
-    it delegates through — those are the harness, not the domain.
+    The three tools listed here are the agent's own. `deepagents` also gives it
+    a virtual filesystem (`ls`, `read_file`, `write_file`, …) and the `task`
+    tool it delegates through — those are the harness, not the domain.
 
     No `checkpointer=`: the nested run inherits the parent's through `config`,
     which is what puts its checkpoints on the parent thread. `store` is passed
@@ -66,7 +66,7 @@ def get_negotiation_agent() -> CompiledStateGraph:
     """
     return create_deep_agent(
         model=get_chat_model(),
-        tools=[recalculate_scenario, check_open_finance_assets],
+        tools=[recalculate_scenario, solve_for_target_dti, check_open_finance_assets],
         system_prompt=load_prompt("negotiation"),
         subagents=[POLICY_RESEARCHER, PRECEDENT_ANALYST],
         context_schema=NegotiationCase,
@@ -161,6 +161,21 @@ def _case_briefing(state: AgentState) -> str:
         f"renda líquida {brl(income.get('net_monthly', 0.0))}, "
         f"score interno {(profile.get('credit') or {}).get('internal_score')}",
     ]
+
+    # Item 10 — reopening an already-decided case (Carlos browsing the
+    # Aprovados/Reprovações tabs) must not read as a live pending decision.
+    # `status` comes straight from `applications` (see `_hydrate_application`
+    # in main.py), never from checkpoint state, so it's always current even
+    # though the graph never runs `decision` again on the analyst path.
+    status = application.get("status")
+    if status and status not in ("manual_review", "auto_approved"):
+        lines.append(
+            f"- ATENÇÃO: este caso JÁ FOI DECIDIDO — status atual: {status}. Não é mais uma "
+            "decisão pendente. Trate qualquer pedido do analista a partir daqui como "
+            "exploração de cenários hipotéticos (entender a dinâmica da aprovação, comparar "
+            "com casos parecidos, simular \"e se\"), nunca como uma nova decisão a ser tomada "
+            "— não recomende aprovar/negar novamente."
+        )
     if calc:
         lines.append(
             f"- Simulação vigente: parcela {brl(calc.get('monthly_payment', 0.0))}, "
@@ -200,10 +215,17 @@ def _map_result(state: AgentState, result: dict, case: NegotiationCase) -> dict:
 
     update: dict = {"messages": [AIMessage(answer)], "scenarios": case.simulated}
 
-    proposal = build_proposal(
+    application = state.get("application") or {}
+    # Item 10 — a case already decided can't be re-proposed for approval,
+    # even if the analyst's exploratory message happens to contain a verdict
+    # keyword (e.g. asking "e se eu tivesse aprovado sem condições?"). Belt
+    # and suspenders with the frontend disabling the buttons: the backend is
+    # the one place this can't be bypassed.
+    already_decided = application.get("status") not in (None, "manual_review", "auto_approved")
+    proposal = None if already_decided else build_proposal(
         analyst_message=_last_human_text(state),
         agent_message=answer,
-        application=state.get("application") or {},
+        application=application,
         # The recommendation is about a structure that was actually computed:
         # this turn's last scenario, or the last one still in state.
         scenario=(case.simulated or state.get("scenarios") or [None])[-1],

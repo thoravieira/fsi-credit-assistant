@@ -3,6 +3,7 @@
 Per SDD 14 §2: real DB (seeded Day 1 on Atlas), fake LLM.
 """
 
+from datetime import date
 from unittest.mock import patch
 
 import pytest
@@ -10,6 +11,8 @@ from langchain_core.language_models.fake_chat_models import FakeListChatModel
 from langchain_core.messages import HumanMessage
 
 from app.db import get_db
+from app.domain.calculator import max_financeable, max_term_by_age
+from app.domain.rules import POLICIES, age_at_maturity
 from app.graph.nodes.credit_calculator import credit_calculator
 from app.graph.nodes.customer_response import customer_response
 from app.graph.nodes.decision import decision
@@ -126,6 +129,73 @@ def test_intake_honours_an_explicitly_stated_financed_amount():
     result = intake(state, llm=fake_llm)
 
     assert result["application"]["requested_amount"] == pytest.approx(250_000.0)
+
+
+def test_intake_flags_solve_financed_max_term_without_requiring_a_stale_term():
+    """"Qual o valor máximo que eu consigo financiar, com o prazo máximo?" must
+    be flagged even though `term_months` is not a fresh fact this turn — the
+    whole point of this intent is that the term is itself unresolved, not
+    reused from whatever the frontend's form default or an earlier turn left
+    behind (the regression this covers: it silently stayed at 48).
+    """
+    prior = {
+        "customer_id": "CUST-0001",
+        "product": "auto",
+        "down_payment": 16_000.0,
+        "term_months": 48,
+        "purpose": "Compra de veículo",
+    }
+    state = _base_state(
+        application=prior,
+        messages=[HumanMessage("qual o valor máximo que eu consigo financiar, com o prazo máximo?")],
+    )
+    fake_llm = _FakeStructuredLLM(_ExtractedFields(intent="solve_financed_max_term"))
+
+    result = intake(state, llm=fake_llm)
+
+    assert result["application"]["_intent"] == "solve_financed_max_term"
+
+
+def test_credit_calculator_solves_financed_for_the_true_max_term():
+    """Regression test for the max-term bug: the stale `term_months: 48` on
+    the application must be replaced by POL-007's age-derived ceiling, not
+    left untouched the way a plain `solve_financed` would.
+    """
+    application = {
+        "product": "auto",
+        "down_payment": 16_000.0,
+        "term_months": 48,
+        "_intent": "solve_financed_max_term",
+    }
+    profile = {
+        "birth_date": "1990-04-17",
+        "credit": {"internal_score": 782, "existing_monthly_debt": 0.0},
+        "income": {"net_monthly": 11_200.0},
+    }
+    state = _base_state(application=application, profile=profile)
+
+    result = credit_calculator(state)
+    solved = result["application"]
+
+    policy = POLICIES["auto"]
+    current_age = age_at_maturity(profile["birth_date"], 0, date.today())
+    expected_term = max_term_by_age(policy.age_at_maturity_limit.value, current_age)
+    expected_financed = max_financeable(
+        product="auto",
+        down_payment=16_000.0,
+        term_months=expected_term,
+        net_income=11_200.0,
+        existing_debt=0.0,
+        score=782,
+        dti_limit=policy.dti_auto_approval_limit.value,
+        ltv_limit=policy.ltv_auto_approval_limit.value,
+        amount_limit=policy.amount_auto_approval_limit.value,
+    )
+
+    assert solved["term_months"] == expected_term
+    assert solved["term_months"] != 48
+    assert solved["requested_amount"] == pytest.approx(expected_financed)
+    assert solved["asset_value"] == pytest.approx(expected_financed + 16_000.0)
 
 
 def test_load_context_reads_seeded_profile():

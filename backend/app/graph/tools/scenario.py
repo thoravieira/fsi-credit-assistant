@@ -12,7 +12,7 @@ Portuguese while the module stays English (CLAUDE.md).
 
 from langchain.tools import ToolRuntime, tool
 
-from app.domain.calculator import compute_scenario
+from app.domain.calculator import compute_scenario, max_financeable_fixed_asset
 from app.domain.formatting import brl, percent
 from app.domain.rules import evaluate
 from app.graph.tools.case import NegotiationCase
@@ -47,12 +47,15 @@ def recalculate_scenario(
 
     `annual_rate` is the analyst exercising their authority (alçada). Left
     unset, the tabled rate for the resulting LTV and score applies.
+
+    This tool only *evaluates a guess* — it cannot answer "what financed
+    amount hits exactly 32% de comprometimento de renda?" without the model
+    interpolating `down_payment`/`amount` itself, which Rule 1 in the
+    negotiation prompt forbids. `solve_for_target_dti` exists for that case.
     """
     case = runtime.context
     application = case.application
     profile = case.profile
-    credit = profile.get("credit") or {}
-    income = profile.get("income") or {}
 
     asset_value = float(application["asset_value"])
     if down_payment is not None:
@@ -61,8 +64,88 @@ def recalculate_scenario(
         financed = float(amount)
     else:
         financed = float(application["requested_amount"])
-    entrada = asset_value - financed
     term = int(term_months if term_months is not None else application["term_months"])
+
+    return _simulate(
+        case, application, profile, financed=financed, term=term, rate=annual_rate, tool_name="recalculate_scenario"
+    )
+
+
+@tool(
+    description=(
+        "Resolve o valor financiado (e a entrada correspondente) para atingir um "
+        "comprometimento de renda (DTI) alvo, mantendo o valor do bem e o prazo fixos — "
+        "devolve os números oficiais já avaliados pela política, sem aproximação. Use esta "
+        "ferramenta em vez de `recalculate_scenario` sempre que Carlos pedir um percentual de "
+        "comprometimento de renda específico (ex.: \"reduzindo o comprometimento para 32%, "
+        "quanto fica o financiamento?\"), em vez de tentar valores de entrada por tentativa."
+    )
+)
+def solve_for_target_dti(
+    runtime: ToolRuntime[NegotiationCase],
+    dti_target: float,
+    term_months: int | None = None,
+) -> dict:
+    """The exact inverse of `recalculate_scenario` for a target DTI.
+
+    Wraps `domain.calculator.max_financeable_fixed_asset` — the same bisection
+    `credit_calculator` uses for the customer's own inverse simulations — so
+    the model gets the financed amount that actually clears `dti_target`
+    instead of guessing a `down_payment`/`amount` and checking the result
+    turn after turn.
+
+    `asset_value` never moves, same invariant as `recalculate_scenario`: it is
+    a fact about the property, not a lever. The down payment the model
+    narrates back is therefore a *consequence* of holding the asset value
+    fixed while `financed` moves to hit the target — not a lever Carlos asked
+    to pull, which is the framing the prompt's response format asks for.
+
+    `ltv_limit=1.0` deliberately leaves LTV unconstrained here: the DTI target
+    is the only thing being solved for, and the resulting LTV is reported
+    (and evaluated against policy) rather than capped mid-bisection.
+    """
+    case = runtime.context
+    application = case.application
+    profile = case.profile
+    credit = profile.get("credit") or {}
+    income = profile.get("income") or {}
+
+    asset_value = float(application["asset_value"])
+    term = int(term_months if term_months is not None else application["term_months"])
+
+    financed = max_financeable_fixed_asset(
+        product=application["product"],
+        asset_value=asset_value,
+        term_months=term,
+        net_income=income.get("net_monthly") or 1.0,
+        existing_debt=credit.get("existing_monthly_debt", 0.0),
+        score=credit.get("internal_score", 650),
+        dti_limit=float(dti_target),
+        ltv_limit=1.0,
+        amount_limit=asset_value,
+    )
+
+    return _simulate(case, application, profile, financed=financed, term=term, rate=None, tool_name="solve_for_target_dti")
+
+
+def _simulate(
+    case: NegotiationCase,
+    application: dict,
+    profile: dict,
+    *,
+    financed: float,
+    term: int,
+    rate: float | None,
+    tool_name: str,
+) -> dict:
+    """Shared by both scenario tools: evaluate one credit structure, shape it
+    for the model, and log it — so a guessed scenario and a solved one are
+    indistinguishable downstream (state, audit log, trace).
+    """
+    credit = profile.get("credit") or {}
+    income = profile.get("income") or {}
+    asset_value = float(application["asset_value"])
+    entrada = asset_value - financed
 
     calc = compute_scenario(
         product=application["product"],
@@ -72,7 +155,7 @@ def recalculate_scenario(
         net_income=income.get("net_monthly") or 1.0,
         existing_debt=credit.get("existing_monthly_debt", 0.0),
         score=credit.get("internal_score", 650),
-        rate=annual_rate,
+        rate=rate,
     )
 
     # The same decision matrix the customer path ran, on the modified
@@ -111,7 +194,7 @@ def recalculate_scenario(
     }
     case.simulated.append(scenario)
     case.step(
-        "recalculate_scenario",
+        tool_name,
         down_payment=entrada,
         term_months=term,
         ltv=calc["ltv"],

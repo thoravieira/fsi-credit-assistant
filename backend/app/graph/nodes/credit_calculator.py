@@ -8,7 +8,13 @@ negotiation cannot disagree with the simulation the customer already saw.
 
 from datetime import date
 
-from app.domain.calculator import compute_scenario, max_financeable, max_financeable_fixed_asset, term_bounds
+from app.domain.calculator import (
+    compute_scenario,
+    max_financeable,
+    max_financeable_fixed_asset,
+    max_term_by_age,
+    term_bounds,
+)
 from app.domain.rules import POLICIES, age_at_maturity
 from app.graph.state import AgentState, CalcResult
 
@@ -53,6 +59,39 @@ def _solve_down_payment(application: dict, policy, net_income: float, existing_d
     )
     application["requested_amount"] = financed
     application["down_payment"] = application["asset_value"] - financed
+
+
+def _solve_financed_max_term(application: dict, policy, profile: dict, net_income: float, existing_debt: float, score: int) -> None:
+    """"Qual o valor máximo que eu consigo financiar, com o prazo máximo?" — a
+    compound ask: down payment is fixed, but unlike `_solve_financed`, the
+    term is *not* a fact already sitting on the application either — it must
+    resolve to POL-006/007's age-derived ceiling first, never to whatever
+    `term_months` happens to still be in state (a stale prior turn, or the
+    frontend form's default). Once the true max term is known, `financed`
+    solves exactly like `_solve_financed` at that term. Leaves `application`
+    untouched with no birth date on file — same "absence of evidence is not
+    evidence of a pass" rule as `_solve_term`.
+    """
+    current_age = age_at_maturity(profile.get("birth_date"), 0, date.today())
+    if current_age is None:
+        return
+    max_term = max_term_by_age(policy.age_at_maturity_limit.value, current_age)
+    if max_term <= 0:
+        return
+    application["term_months"] = max_term
+    financed = max_financeable(
+        product=application["product"],
+        down_payment=application["down_payment"],
+        term_months=max_term,
+        net_income=net_income,
+        existing_debt=existing_debt,
+        score=score,
+        dti_limit=policy.dti_auto_approval_limit.value,
+        ltv_limit=policy.ltv_auto_approval_limit.value,
+        amount_limit=policy.amount_auto_approval_limit.value,
+    )
+    application["requested_amount"] = financed
+    application["asset_value"] = financed + application["down_payment"]
 
 
 def _solve_term(application: dict, policy, profile: dict, net_income: float, existing_debt: float, score: int, *, want: str) -> None:
@@ -106,10 +145,12 @@ def credit_calculator(state: AgentState) -> dict:
     # never survives past this node either way.
     intent = application.pop("_intent", None)
     solver = _SOLVERS.get(intent)
-    if solver or intent in ("solve_term_min", "solve_term_max"):
+    if solver or intent in ("solve_term_min", "solve_term_max", "solve_financed_max_term"):
         policy = POLICIES[application["product"]]
         if solver:
             solver(application, policy, net_income, existing_debt, score)
+        elif intent == "solve_financed_max_term":
+            _solve_financed_max_term(application, policy, profile, net_income, existing_debt, score)
         else:
             _solve_term(application, policy, profile, net_income, existing_debt, score, want=intent.removeprefix("solve_term_"))
         result["application"] = application

@@ -37,6 +37,15 @@ _VERDICTS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("approved", ("aprovar", "aprovo", "aprovado", "aprovada", "pode aprovar")),
 )
 
+# Word-boundary, not raw substring: "aprovados" (plural, e.g. "casos ...
+# aprovados") must not trip the "aprovado" keyword. `\b` on both ends of a
+# multi-word phrase like "com ressalvas" still works, since the internal
+# space is itself a non-word character.
+_VERDICT_PATTERNS: tuple[tuple[str, tuple[re.Pattern[str], ...]], ...] = tuple(
+    (outcome, tuple(re.compile(rf"\b{re.escape(keyword)}\b") for keyword in keywords))
+    for outcome, keywords in _VERDICTS
+)
+
 
 def _fold(text: str) -> str:
     """Lowercase and strip accents, so "condições" and "condicoes" both match."""
@@ -47,8 +56,8 @@ def _fold(text: str) -> str:
 def detect_verdict(analyst_message: str) -> str | None:
     """The analyst's final call, or `None` while the negotiation continues."""
     folded = _fold(analyst_message)
-    for outcome, keywords in _VERDICTS:
-        if any(keyword in folded for keyword in keywords):
+    for outcome, patterns in _VERDICT_PATTERNS:
+        if any(pattern.search(folded) for pattern in patterns):
             return outcome
     return None
 

@@ -1,9 +1,24 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChatInputBar, ChatMessages } from './ChatThread';
 import type { ChatMessage } from '../hooks/useAgentStream';
 import type { Decision, Product } from '../lib/api';
 import { fmtBRL0, fmtPct } from '../lib/api';
+
+// Demo-fixed profile display fields for the popup (item 3). The phone mockup
+// always shows Mariana's own account (CUST-0001, `app/page.tsx`'s
+// CUSTOMER_ID) — there's no customer-facing profile-fetch endpoint (SDD 11),
+// and an account number isn't part of the stored schema at all, so this
+// mirrors the seeded `data/profiles/profiles.json` record as static copy,
+// the same way the header already hardcoded the name and "cliente desde".
+const CUSTOMER_PROFILE = {
+  initials: 'MD',
+  name: 'Mariana Duarte',
+  since: 'Cliente desde 2016',
+  account: '0842 · 118.223-4',
+  cpf: '***.456.789-**',
+  relationship: 'Conta corrente, cartão de crédito, seguro auto',
+};
 
 // Down-payment slider range differs by product (POL-024 mortgage vs. POL-025
 // auto): a 60k-220k mortgage range would leave a R$16.000 default vehicle
@@ -48,6 +63,9 @@ export function CustomerApp({
   onSend,
   decision,
   onContract,
+  hasUnreadDecision,
+  onBellClick,
+  highlightMessageId,
 }: {
   product: Product;
   setProduct: (p: Product) => void;
@@ -74,9 +92,16 @@ export function CustomerApp({
   onSend: (text: string) => void;
   decision: Decision | null;
   onContract: (m: ChatMessage) => void;
+  // Item 4 — set by `app/page.tsx` from a fresh `GET /api/applications/:id`
+  // compared against a per-thread "last seen decision" marker, so the bell
+  // rings again after a *new* analyst decision, not on every reopen.
+  hasUnreadDecision: boolean;
+  onBellClick: () => void;
+  highlightMessageId: string | null;
 }) {
   const activeTab = PRODUCT_TABS.find((t) => t.key === product) ?? PRODUCT_TABS[0];
   const downRange = DOWN_PAYMENT_RANGE[product];
+  const [profileOpen, setProfileOpen] = useState(false);
   // Explicitly loaded via the history icon (real `GET /api/history` +
   // `GET /api/applications`, app/page.tsx's `openHistory`) — this screen
   // never auto-restores anything on its own.
@@ -93,26 +118,61 @@ export function CustomerApp({
   }, [chatVisible, messages.length, decision]);
 
   return (
-    <div className="flex h-full flex-col bg-[#F4F5F6]">
-      <div className="flex flex-none flex-col gap-[13px] bg-ink px-[18px] pb-4 pt-[54px]">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-[34px] w-[34px] flex-none items-center justify-center bg-white/[0.12] text-[12.5px] font-bold text-white">MD</div>
-            <div>
-              <div className="text-[14px] font-semibold leading-[1.25] text-white">Mariana Duarte</div>
-              <div className="text-[11px] text-white/45">Cliente desde 2016</div>
-            </div>
-          </div>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.5)" strokeWidth="1.8" strokeLinecap="round">
+    <div className="relative flex h-full flex-col bg-[#F4F5F6]">
+      <div className="flex flex-none items-center justify-between bg-ink px-[18px] pb-3.5 pt-[54px]">
+        <div className="flex items-center gap-2">
+          <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-white/45">{activeTab.header}</span>
+          <button
+            onClick={() => setProfileOpen(true)}
+            aria-label="Ver dados do cliente"
+            className="flex h-[30px] w-[30px] flex-none items-center justify-center bg-white/[0.12] text-[11.5px] font-bold text-white"
+          >
+            {CUSTOMER_PROFILE.initials}
+          </button>
+        </div>
+        <button onClick={onBellClick} aria-label="Notificações" className="relative flex h-7 w-7 flex-none items-center justify-center">
+          <svg
+            width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.5)" strokeWidth="1.8" strokeLinecap="round"
+            className={hasUnreadDecision ? 'animate-bell-ring' : undefined}
+          >
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
           </svg>
-        </div>
-        <div>
-          <div className="text-[10.5px] uppercase tracking-[0.08em] text-white/45">{activeTab.header}</div>
-          <div className="mt-0.5 text-[21px] font-bold text-white">{formOpen ? 'Simular crédito' : 'Sua simulação'}</div>
-        </div>
+          {hasUnreadDecision && <span className="absolute right-1 top-0.5 h-[7px] w-[7px] bg-spring" />}
+        </button>
       </div>
+
+      {profileOpen && (
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center bg-black/45 p-6"
+          onClick={() => setProfileOpen(false)}
+        >
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[290px] border border-[rgba(0,30,43,0.16)] bg-white p-5">
+            <div className="flex items-start justify-between">
+              <div className="flex h-10 w-10 flex-none items-center justify-center bg-ink text-[13px] font-bold text-white">
+                {CUSTOMER_PROFILE.initials}
+              </div>
+              <button onClick={() => setProfileOpen(false)} aria-label="Fechar" className="text-[20px] leading-none text-ink/40">
+                ×
+              </button>
+            </div>
+            <div className="mt-3 text-[15px] font-bold text-ink">{CUSTOMER_PROFILE.name}</div>
+            <div className="mt-3 flex flex-col gap-2 text-[12.5px]">
+              {[
+                ['Cliente desde', CUSTOMER_PROFILE.since.replace('Cliente desde ', '')],
+                ['Conta', CUSTOMER_PROFILE.account],
+                ['CPF', CUSTOMER_PROFILE.cpf],
+                ['Relacionamento', CUSTOMER_PROFILE.relationship],
+              ].map(([label, value]) => (
+                <div key={label} className="flex justify-between gap-3">
+                  <span className="text-ink/45">{label}</span>
+                  <b className="text-right text-ink">{value}</b>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Always visible, on the form and on the chat — the only two ways in
           or out of a case: reopen the simulation form, or pull the real
@@ -228,13 +288,13 @@ export function CustomerApp({
               customer who re-simulates several times keeps every proposal's
               result in place instead of one card overwritten by the latest. */}
           <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto p-3.5">
-            <ChatMessages messages={messages} onContract={onContract} />
+            <ChatMessages messages={messages} onContract={onContract} highlightMessageId={highlightMessageId} />
           </div>
 
           {/* Pinned footer: the composer is always the last thing on screen —
               reopening the form is the icon in the utility bar above now. */}
           <div className="flex flex-none border-t border-[#E7E9E8] bg-[#F4F5F6] px-3.5 pb-2.5 pt-2">
-            <ChatInputBar onSend={onSend} disabled={isStreaming} placeholder="Escreva para o assistente…" />
+            <ChatInputBar onSend={onSend} disabled={isStreaming} placeholder="Escreva para o assistente…" large />
           </div>
         </div>
       )}

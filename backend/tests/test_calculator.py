@@ -8,6 +8,7 @@ from app.domain.calculator import (
     dti,
     effective_monthly_rate,
     ltv,
+    max_term_by_age,
     pmt,
     schedule_preview,
 )
@@ -95,6 +96,10 @@ def test_annual_rate_mortgage_matches_pol_018(ltv_value, score, expected):
 )
 def test_annual_rate_auto_matches_pol_019(ltv_value, score, expected):
     assert annual_rate("auto", ltv_value=ltv_value, score=score) == pytest.approx(expected)
+
+
+def test_max_term_by_age_is_pure_months_remaining_to_the_ceiling():
+    assert max_term_by_age(age_limit=80, current_age_years=44) == 432  # (80-44)*12
 
 
 def test_schedule_preview_returns_first_two_and_last_row():

@@ -20,11 +20,19 @@ a:hover { color: #00ED64; }
   0%, 100% { box-shadow: 0 0 0 3px var(--pulse-color, rgba(0,104,74,.3)); }
   50% { box-shadow: 0 0 0 6px var(--pulse-color, rgba(0,104,74,.12)); }
 }
+@keyframes bellRing {
+  0%, 50%, 100% { transform: rotate(0deg); }
+  10% { transform: rotate(-12deg); }
+  20% { transform: rotate(10deg); }
+  30% { transform: rotate(-8deg); }
+  40% { transform: rotate(4deg); }
+}
 
 .animate-caret { animation: caret .8s step-end infinite; }
 .animate-soft-blink { animation: softBlink 1.4s infinite; }
 .animate-row-in { animation: rowIn .3s ease; }
 .animate-card-pulse { animation: cardPulse 1s ease-in-out infinite; }
+.animate-bell-ring { animation: bellRing 1.8s ease-in-out infinite; transform-origin: 50% 0%; }
 
 ::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-thumb { background: rgba(32, 30, 29, .22); }

@@ -22,9 +22,17 @@ _SYSTEM_PROMPT = (
     "resolver QUALQUER uma das três variáveis do financiamento, mantendo as "
     "outras duas fixas:\n"
     "- 'solve_financed': pergunta o valor MÁXIMO de financiamento/crédito ou o "
-    "valor máximo do imóvel/veículo que consegue, dado um valor de entrada "
-    "(ex.: \"qual o máximo que eu consigo pré-aprovado dando X de entrada?\"). "
-    "A entrada é o dado fixo; o financiamento/valor do bem é a incógnita.\n"
+    "valor máximo do imóvel/veículo que consegue, dado um valor de entrada e "
+    "um prazo já definidos (ex.: \"qual o máximo que eu consigo pré-aprovado "
+    "dando X de entrada?\"). A entrada é o dado fixo; o financiamento/valor "
+    "do bem é a incógnita.\n"
+    "- 'solve_financed_max_term': como 'solve_financed', mas a mensagem "
+    "também pede o PRAZO MÁXIMO explicitamente, junto com o valor máximo "
+    "(ex.: \"qual o valor máximo que eu consigo financiar, com o prazo "
+    "máximo?\"). Use esta em vez de 'solve_financed' quando as duas coisas "
+    "forem pedidas juntas — o prazo máximo nunca é um número já mencionado "
+    "antes na conversa, é obtido da política. A entrada é o dado fixo; "
+    "financiamento e prazo são as incógnitas.\n"
     "- 'solve_down_payment': pergunta a MENOR entrada que precisa dar, mantendo "
     "o mesmo valor do imóvel/veículo e prazo (ex.: \"qual a menor entrada para "
     "o mesmo valor e prazo?\"). O valor do bem e o prazo são fixos; a entrada é "
@@ -46,7 +54,9 @@ class _ExtractedFields(BaseModel):
     requested_amount: float | None = None
     term_months: int | None = None
     purpose: str | None = None
-    intent: Literal["update", "solve_financed", "solve_down_payment", "solve_term_min", "solve_term_max"] = "update"
+    intent: Literal[
+        "update", "solve_financed", "solve_financed_max_term", "solve_down_payment", "solve_term_min", "solve_term_max"
+    ] = "update"
 
 
 # Which fields must already be known (product + purpose are always required —
@@ -57,6 +67,11 @@ class _ExtractedFields(BaseModel):
 # item 2 — "faça perguntas adicionais para ter todos os 4 dados").
 _SOLVE_REQUIRES: dict[str, tuple[str, ...]] = {
     "solve_financed": ("down_payment", "term_months"),
+    # No `term_months` here on purpose: the term is the second unknown this
+    # intent solves for (from the policy's age ceiling), not a fact it needs
+    # already on the application — requiring it would make a stale prior term
+    # block the fallthrough to plain `update` instead of fixing it.
+    "solve_financed_max_term": ("down_payment",),
     "solve_down_payment": ("asset_value", "term_months"),
     "solve_term_min": ("asset_value", "down_payment"),
     "solve_term_max": ("asset_value", "down_payment"),

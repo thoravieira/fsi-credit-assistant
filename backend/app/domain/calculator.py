@@ -197,6 +197,16 @@ def max_financeable_fixed_asset(
     return lo
 
 
+def max_term_by_age(age_limit: float, current_age_years: float) -> int:
+    """Months remaining until POL-006/007's age-at-maturity ceiling — the only
+    constraint on the maximum term, since DTI never becomes binding again past
+    `term_bounds`'s `min_term` (see its docstring). Split out so a solve that
+    needs the ceiling *before* `financed` is known (there is no amount to
+    plug into `term_bounds` yet) can still get it without a circular call.
+    """
+    return int((age_limit - current_age_years) * 12)
+
+
 def term_bounds(
     *,
     product: Product,
@@ -257,7 +267,7 @@ def term_bounds(
 
     if current_age_years is None:
         return {"feasible": False, "reason": "birth_date_missing", "min_term": min_term, "max_term": None}
-    max_term = int((age_limit - current_age_years) * 12)
+    max_term = max_term_by_age(age_limit, current_age_years)
     if max_term < min_term:
         return {"feasible": False, "reason": "age_conflicts_with_dti", "min_term": min_term, "max_term": max_term}
     return {"feasible": True, "reason": None, "min_term": min_term, "max_term": max_term}

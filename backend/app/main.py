@@ -255,7 +255,7 @@ def _is_customer_facing_token(message_chunk, meta: dict) -> bool:
     return meta.get("langgraph_node") not in _SILENT_LLM_NODES
 
 
-def _hydrate_application(thread_id: str, existing: dict | None) -> dict | None:
+def _hydrate_application(row: dict | None, existing: dict | None) -> dict | None:
     """SDD 04 §1 — `thread_id == application_id`.
 
     The graph has no other way to learn which application it is working on:
@@ -268,7 +268,6 @@ def _hydrate_application(thread_id: str, existing: dict | None) -> dict | None:
     turn would discard the patches `intake` made on previous turns and silently
     undo a re-simulation.
     """
-    row = get_db()["applications"].find_one({"_id": thread_id})
     if row is None:
         return existing
 
@@ -281,8 +280,37 @@ def _hydrate_application(thread_id: str, existing: dict | None) -> dict | None:
         "requested_amount": row.get("requested_amount"),
         "term_months": row.get("term_months"),
         "purpose": row.get("purpose", ""),
+        # Item 10 — unlike the negotiable inputs above, `status` is never
+        # written into checkpoint state by any node (`persist_decision`
+        # doesn't return it), so it always comes from here: the one place
+        # that can tell the negotiation agent a case it's reopening was
+        # already approved/denied by a human, not still pending.
+        "status": row.get("status"),
     }
     return {**stored, **(existing or {})}
+
+
+def _hydrate_decision_context(
+    row: dict | None, existing_calc: dict | None, existing_decision: dict | None
+) -> tuple[dict | None, dict | None]:
+    """Sibling of `_hydrate_application` for `calc`/`decision`.
+
+    Every case that reached Carlos's queue *used to* have gotten there by
+    running through the live customer-path graph first, which always leaves
+    `calc`/`decision` in the checkpoint before an analyst ever opens it. An
+    application seeded straight into `applications` (Part B of the demo
+    data) skips that entirely — its checkpoint has neither — so
+    `analyst_brief`'s dossier and `negotiation`'s case briefing would open on
+    a blank assessment. Same "checkpoint wins" rule as `_hydrate_application`:
+    only fall back to the stored row when the checkpoint truly has nothing,
+    never overwrite a live negotiation's own recalculated state.
+    """
+    if row is None or existing_calc is not None or existing_decision is not None:
+        return existing_calc, existing_decision
+    latest_assessment = row.get("latest_assessment") or {}
+    calc = latest_assessment.get("calc")
+    decision = row.get("final_decision") or latest_assessment.get("decision")
+    return calc, decision
 
 
 async def stream_chat_events(
@@ -302,9 +330,15 @@ async def stream_chat_events(
     payload = {"persona": persona, "messages": [HumanMessage(message)]}
 
     snapshot = await graph.aget_state(config)
-    application = _hydrate_application(thread_id, snapshot.values.get("application"))
+    row = get_db()["applications"].find_one({"_id": thread_id})
+    application = _hydrate_application(row, snapshot.values.get("application"))
     if application is not None:
         payload["application"] = application
+    calc, decision = _hydrate_decision_context(row, snapshot.values.get("calc"), snapshot.values.get("decision"))
+    if calc is not None:
+        payload["calc"] = calc
+    if decision is not None:
+        payload["decision"] = decision
 
     t_prev = time.perf_counter()
     pending_detail: dict = {}

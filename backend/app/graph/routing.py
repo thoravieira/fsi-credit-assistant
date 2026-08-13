@@ -8,7 +8,13 @@ from app.graph.state import AgentState
 
 def route(state: AgentState) -> str:
     if state["persona"] == "analyst":
-        return "precedent_search" if state["stage"] == "review" else "negotiation"
+        # A thread with no `stage` in its checkpoint yet — e.g. an
+        # application seeded straight into `applications` rather than run
+        # through the customer path first — is exactly the "haven't shown
+        # the dossier" case `analyst_brief` marks by later setting
+        # `stage="negotiation"`; treat it the same as `"review"`, not as
+        # already-negotiated.
+        return "negotiation" if state.get("stage") == "negotiation" else "precedent_search"
     return "intake"
 
 

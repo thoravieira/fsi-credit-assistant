@@ -15,9 +15,67 @@ from langchain_core.language_models.fake_chat_models import FakeListChatModel
 
 from app.db import get_db
 from app.graph.nodes.intake import _ExtractedFields
-from app.main import app
+from app.main import _hydrate_application, _hydrate_decision_context, app
 
 client = TestClient(app)
+
+
+# --- hydration helpers (pure, no I/O) ---------------------------------------
+# SDD 04 §1 / item 10 — an application seeded straight into `applications`
+# (Part B of the demo data) has never run through the graph, so its
+# checkpoint has neither `application` patches nor `calc`/`decision` yet.
+# These must fall back to the stored row without ever clobbering a live
+# checkpoint's own state — the exact bug this covers crashed `/api/chat` for
+# every one of the 50 seeded applications the first time an analyst opened one
+# (`route()` did `state["stage"]` on a checkpoint that had no `stage` key at
+# all — see `test_routing.py`).
+
+
+def test_hydrate_application_lets_the_checkpoint_win_over_the_stored_row():
+    row = {
+        "_id": "APP-X", "customer_id": "CUST-X", "product": "mortgage",
+        "asset_value": 400_000.0, "down_payment": 100_000.0, "requested_amount": 300_000.0,
+        "term_months": 360, "purpose": "compra", "status": "manual_review",
+    }
+    existing = {"down_payment": 150_000.0}  # a patch from a prior intake turn
+
+    result = _hydrate_application(row, existing)
+
+    assert result["down_payment"] == 150_000.0
+    assert result["status"] == "manual_review"
+
+
+def test_hydrate_application_returns_existing_untouched_when_the_row_is_missing():
+    assert _hydrate_application(None, {"foo": "bar"}) == {"foo": "bar"}
+
+
+def test_hydrate_decision_context_falls_back_to_the_stored_assessment_when_the_checkpoint_is_empty():
+    row = {"latest_assessment": {"calc": {"ltv": 0.7}, "decision": {"outcome": "manual_review"}}}
+
+    calc, decision = _hydrate_decision_context(row, None, None)
+
+    assert calc == {"ltv": 0.7}
+    assert decision == {"outcome": "manual_review"}
+
+
+def test_hydrate_decision_context_prefers_the_final_decision_over_the_original_assessment():
+    row = {
+        "latest_assessment": {"calc": {"ltv": 0.7}, "decision": {"outcome": "manual_review"}},
+        "final_decision": {"outcome": "approved_with_conditions"},
+    }
+
+    _calc, decision = _hydrate_decision_context(row, None, None)
+
+    assert decision == {"outcome": "approved_with_conditions"}
+
+
+def test_hydrate_decision_context_never_overwrites_a_live_checkpoint():
+    row = {"latest_assessment": {"calc": {"ltv": 0.99}, "decision": {"outcome": "denied"}}}
+
+    calc, decision = _hydrate_decision_context(row, {"ltv": 0.5}, {"outcome": "manual_review"})
+
+    assert calc == {"ltv": 0.5}
+    assert decision == {"outcome": "manual_review"}
 
 
 @pytest.fixture

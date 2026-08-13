@@ -1,0 +1,647 @@
+[
+  {
+    "_id": "APP-SEED-0001",
+    "customer_id": "CUST-0001",
+    "product": "mortgage",
+    "asset_value": 178000.0,
+    "down_payment": 71200.0,
+    "term_months": 360,
+    "purpose": "Aquisição de imóvel residencial próprio",
+    "created_at": "2025-06-24T17:33:00+00:00",
+    "updated_at": "2025-06-24T18:10:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0002",
+    "customer_id": "CUST-0001",
+    "product": "auto",
+    "asset_value": 165000.0,
+    "down_payment": 49500.0,
+    "term_months": 48,
+    "purpose": "Troca de veículo",
+    "created_at": "2026-01-18T13:53:00+00:00",
+    "updated_at": "2026-01-29T14:01:00+00:00",
+    "resolution": {
+      "outcome": "approved_with_conditions",
+      "rationale": "Comprometimento de renda acima da faixa de aprovação automática, compensado por relacionamento bancário de longa data e portabilidade de salário ativa.",
+      "policy_refs": [
+        "POL-005"
+      ],
+      "conditions": [
+        "Manutenção da portabilidade de salário ativa durante a vigência do contrato"
+      ]
+    }
+  },
+  {
+    "_id": "APP-SEED-0003",
+    "customer_id": "CUST-0002",
+    "product": "mortgage",
+    "asset_value": 427000.0,
+    "down_payment": 170800.0,
+    "term_months": 300,
+    "purpose": "Aquisição de apartamento para moradia",
+    "created_at": "2025-09-08T18:36:00+00:00",
+    "updated_at": "2025-09-08T18:42:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0004",
+    "customer_id": "CUST-0003",
+    "product": "auto",
+    "asset_value": 54500.0,
+    "down_payment": 19075.0,
+    "term_months": 48,
+    "purpose": "Aquisição de veículo novo",
+    "created_at": "2025-07-14T17:27:00+00:00",
+    "updated_at": "2025-07-14T17:56:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0005",
+    "customer_id": "CUST-0004",
+    "product": "mortgage",
+    "asset_value": 320000.0,
+    "down_payment": 96000.0,
+    "term_months": 300,
+    "purpose": "Troca por imóvel residencial maior",
+    "created_at": "2025-06-20T09:06:00+00:00",
+    "updated_at": "2025-06-20T09:21:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0006",
+    "customer_id": "CUST-0004",
+    "product": "auto",
+    "asset_value": 55000.0,
+    "down_payment": 16500.0,
+    "term_months": 48,
+    "purpose": "Aquisição de veículo seminovo",
+    "created_at": "2025-11-07T12:02:00+00:00",
+    "updated_at": "2025-11-07T12:17:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0007",
+    "customer_id": "CUST-0005",
+    "product": "mortgage",
+    "asset_value": 240000.0,
+    "down_payment": 72000.0,
+    "term_months": 300,
+    "purpose": "Financiamento de imóvel residencial",
+    "created_at": "2025-08-01T18:57:00+00:00",
+    "updated_at": "2025-08-01T19:28:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0008",
+    "customer_id": "CUST-0006",
+    "product": "mortgage",
+    "asset_value": 260000.0,
+    "down_payment": 78000.0,
+    "term_months": 300,
+    "purpose": "Aquisição de casa para moradia da família",
+    "created_at": "2025-03-27T10:40:00+00:00",
+    "updated_at": "2025-03-27T11:00:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0009",
+    "customer_id": "CUST-0006",
+    "product": "auto",
+    "asset_value": 48000.0,
+    "down_payment": 14400.0,
+    "term_months": 48,
+    "purpose": "Troca de veículo por modelo mais novo",
+    "created_at": "2026-01-12T16:13:00+00:00",
+    "updated_at": "2026-01-12T16:33:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0010",
+    "customer_id": "CUST-0007",
+    "product": "auto",
+    "asset_value": 31500.0,
+    "down_payment": 11025.0,
+    "term_months": 48,
+    "purpose": "Aquisição de primeiro veículo",
+    "created_at": "2025-09-02T14:38:00+00:00",
+    "updated_at": "2025-09-02T15:16:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0011",
+    "customer_id": "CUST-0008",
+    "product": "auto",
+    "asset_value": 95000.0,
+    "down_payment": 33250.0,
+    "term_months": 48,
+    "purpose": "Troca de veículo",
+    "created_at": "2025-04-07T08:44:00+00:00",
+    "updated_at": "2025-04-12T12:07:00+00:00",
+    "resolution": {
+      "outcome": "approved_with_conditions",
+      "rationale": "Score interno abaixo da faixa de aprovação automática para veículo, compensado por renda elevada e relacionamento como cliente pessoa jurídica; aprovado mediante inclusão de avalista.",
+      "policy_refs": [
+        "POL-009",
+        "POL-015"
+      ],
+      "conditions": [
+        "Inclusão de avalista com renda comprovada e score interno igual ou superior a 750"
+      ]
+    }
+  },
+  {
+    "_id": "APP-SEED-0012",
+    "customer_id": "CUST-0008",
+    "product": "auto",
+    "asset_value": 182000.0,
+    "down_payment": 45500.0,
+    "term_months": 48,
+    "purpose": "Aquisição de veículo novo",
+    "created_at": "2025-10-16T13:17:00+00:00",
+    "updated_at": "2025-10-16T13:34:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0013",
+    "customer_id": "CUST-0008",
+    "product": "mortgage",
+    "asset_value": 420000.0,
+    "down_payment": 126000.0,
+    "term_months": 300,
+    "purpose": "Aquisição de imóvel residencial próprio",
+    "created_at": "2026-02-20T09:22:00+00:00",
+    "updated_at": "2026-02-20T09:38:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0014",
+    "customer_id": "CUST-0009",
+    "product": "mortgage",
+    "asset_value": 200000.0,
+    "down_payment": 60000.0,
+    "term_months": 300,
+    "purpose": "Aquisição de apartamento para moradia",
+    "created_at": "2025-08-29T09:23:00+00:00",
+    "updated_at": "2025-08-29T09:49:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0015",
+    "customer_id": "CUST-0010",
+    "product": "mortgage",
+    "asset_value": 210000.0,
+    "down_payment": 63000.0,
+    "term_months": 300,
+    "purpose": "Troca por imóvel residencial maior",
+    "created_at": "2025-04-01T09:07:00+00:00",
+    "updated_at": "2025-04-01T09:25:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0016",
+    "customer_id": "CUST-0010",
+    "product": "auto",
+    "asset_value": 42000.0,
+    "down_payment": 14700.0,
+    "term_months": 48,
+    "purpose": "Aquisição de veículo seminovo",
+    "created_at": "2025-12-27T09:06:00+00:00",
+    "updated_at": "2025-12-27T09:32:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0017",
+    "customer_id": "CUST-0011",
+    "product": "mortgage",
+    "asset_value": 504000.0,
+    "down_payment": 151200.0,
+    "term_months": 300,
+    "purpose": "Financiamento de imóvel residencial",
+    "created_at": "2025-07-10T14:58:00+00:00",
+    "updated_at": "2025-07-10T15:34:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0018",
+    "customer_id": "CUST-0012",
+    "product": "mortgage",
+    "asset_value": 150000.0,
+    "down_payment": 45000.0,
+    "term_months": 300,
+    "purpose": "Aquisição de casa para moradia da família",
+    "created_at": "2025-08-30T12:20:00+00:00",
+    "updated_at": "2025-08-30T12:38:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0019",
+    "customer_id": "CUST-0013",
+    "product": "auto",
+    "asset_value": 22000.0,
+    "down_payment": 7700.0,
+    "term_months": 48,
+    "purpose": "Troca de veículo por modelo mais novo",
+    "created_at": "2025-10-27T08:04:00+00:00",
+    "updated_at": "2025-10-27T08:09:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0020",
+    "customer_id": "CUST-0014",
+    "product": "mortgage",
+    "asset_value": 400000.0,
+    "down_payment": 120000.0,
+    "term_months": 300,
+    "purpose": "Aquisição de imóvel residencial próprio",
+    "created_at": "2025-09-19T17:29:00+00:00",
+    "updated_at": "2025-09-19T18:06:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0021",
+    "customer_id": "CUST-0015",
+    "product": "auto",
+    "asset_value": 22000.0,
+    "down_payment": 7700.0,
+    "term_months": 48,
+    "purpose": "Aquisição de primeiro veículo",
+    "created_at": "2025-08-04T09:54:00+00:00",
+    "updated_at": "2025-08-04T10:12:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0022",
+    "customer_id": "CUST-0016",
+    "product": "auto",
+    "asset_value": 110000.0,
+    "down_payment": 38500.0,
+    "term_months": 48,
+    "purpose": "Troca de veículo",
+    "created_at": "2025-02-10T19:05:00+00:00",
+    "updated_at": "2025-02-22T23:03:00+00:00",
+    "resolution": {
+      "outcome": "approved_with_conditions",
+      "rationale": "Score interno abaixo da faixa de aprovação automática para veículo, compensado por compartilhamento de ativos via Open Finance equivalente a mais de 15% do valor solicitado.",
+      "policy_refs": [
+        "POL-009",
+        "POL-017"
+      ],
+      "conditions": [
+        "Manutenção do compartilhamento de ativos via Open Finance durante a vigência do contrato"
+      ]
+    }
+  },
+  {
+    "_id": "APP-SEED-0023",
+    "customer_id": "CUST-0016",
+    "product": "mortgage",
+    "asset_value": 480000.0,
+    "down_payment": 144000.0,
+    "term_months": 300,
+    "purpose": "Aquisição de apartamento para moradia",
+    "created_at": "2025-07-10T14:58:00+00:00",
+    "updated_at": "2025-07-10T15:22:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0024",
+    "customer_id": "CUST-0016",
+    "product": "auto",
+    "asset_value": 95000.0,
+    "down_payment": 33250.0,
+    "term_months": 36,
+    "purpose": "Aquisição de veículo novo",
+    "created_at": "2026-02-05T16:31:00+00:00",
+    "updated_at": "2026-02-05T16:37:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0025",
+    "customer_id": "CUST-0017",
+    "product": "auto",
+    "asset_value": 26000.0,
+    "down_payment": 9100.0,
+    "term_months": 48,
+    "purpose": "Aquisição de veículo seminovo",
+    "created_at": "2025-07-18T10:25:00+00:00",
+    "updated_at": "2025-07-18T11:06:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0026",
+    "customer_id": "CUST-0018",
+    "product": "auto",
+    "asset_value": 20000.0,
+    "down_payment": 7000.0,
+    "term_months": 48,
+    "purpose": "Troca de veículo por modelo mais novo",
+    "created_at": "2025-05-03T08:41:00+00:00",
+    "updated_at": "2025-05-03T09:24:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0027",
+    "customer_id": "CUST-0018",
+    "product": "mortgage",
+    "asset_value": 121000.0,
+    "down_payment": 36300.0,
+    "term_months": 240,
+    "purpose": "Troca por imóvel residencial maior",
+    "created_at": "2026-02-06T11:55:00+00:00",
+    "updated_at": "2026-02-09T14:26:00+00:00",
+    "resolution": {
+      "outcome": "denied",
+      "rationale": "Comprometimento de renda no limite da faixa de análise manual, sem margem suficiente diante da renda líquida do cliente; indeferido pelo analista.",
+      "policy_refs": [
+        "POL-004"
+      ],
+      "conditions": []
+    }
+  },
+  {
+    "_id": "APP-SEED-0028",
+    "customer_id": "CUST-0019",
+    "product": "mortgage",
+    "asset_value": 108000.0,
+    "down_payment": 32400.0,
+    "term_months": 240,
+    "purpose": "Financiamento de imóvel residencial",
+    "created_at": "2025-08-19T18:23:00+00:00",
+    "updated_at": "2025-08-19T18:34:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0029",
+    "customer_id": "CUST-0020",
+    "product": "mortgage",
+    "asset_value": 150000.0,
+    "down_payment": 60000.0,
+    "term_months": 300,
+    "purpose": "Aquisição de casa para moradia da família",
+    "created_at": "2025-07-18T19:10:00+00:00",
+    "updated_at": "2025-07-18T19:31:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0030",
+    "customer_id": "CUST-0020",
+    "product": "auto",
+    "asset_value": 60000.0,
+    "down_payment": 21000.0,
+    "term_months": 48,
+    "purpose": "Aquisição de primeiro veículo",
+    "created_at": "2026-01-15T11:52:00+00:00",
+    "updated_at": "2026-01-15T12:30:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0031",
+    "customer_id": "CUST-0021",
+    "product": "mortgage",
+    "asset_value": 95000.0,
+    "down_payment": 28500.0,
+    "term_months": 300,
+    "purpose": "Aquisição de imóvel residencial próprio",
+    "created_at": "2025-04-04T15:14:00+00:00",
+    "updated_at": "2025-04-08T17:49:00+00:00",
+    "resolution": {
+      "outcome": "approved_with_conditions",
+      "rationale": "Score interno cinco pontos abaixo da faixa de aprovação automática, compensado por relacionamento bancário consistente e renda comprovada; aprovado com seguro MIP e DFI reforçados.",
+      "policy_refs": [
+        "POL-008"
+      ],
+      "conditions": [
+        "Contratação de seguro MIP e DFI reforçado"
+      ]
+    }
+  },
+  {
+    "_id": "APP-SEED-0032",
+    "customer_id": "CUST-0021",
+    "product": "auto",
+    "asset_value": 36500.0,
+    "down_payment": 12775.0,
+    "term_months": 48,
+    "purpose": "Troca de veículo",
+    "created_at": "2025-12-01T12:02:00+00:00",
+    "updated_at": "2025-12-01T12:30:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0033",
+    "customer_id": "CUST-0022",
+    "product": "mortgage",
+    "asset_value": 142000.0,
+    "down_payment": 56800.0,
+    "term_months": 300,
+    "purpose": "Aquisição de apartamento para moradia",
+    "created_at": "2025-06-02T09:18:00+00:00",
+    "updated_at": "2025-06-02T09:39:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0034",
+    "customer_id": "CUST-0022",
+    "product": "mortgage",
+    "asset_value": 650000.0,
+    "down_payment": 292500.0,
+    "term_months": 300,
+    "purpose": "Troca por imóvel residencial maior",
+    "created_at": "2025-11-13T11:38:00+00:00",
+    "updated_at": "2025-11-13T12:23:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0035",
+    "customer_id": "CUST-0023",
+    "product": "mortgage",
+    "asset_value": 150000.0,
+    "down_payment": 52500.0,
+    "term_months": 300,
+    "purpose": "Financiamento de imóvel residencial",
+    "created_at": "2025-09-20T17:58:00+00:00",
+    "updated_at": "2025-09-20T18:37:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0036",
+    "customer_id": "CUST-0024",
+    "product": "mortgage",
+    "asset_value": 108000.0,
+    "down_payment": 43200.0,
+    "term_months": 300,
+    "purpose": "Aquisição de casa para moradia da família",
+    "created_at": "2025-03-30T14:53:00+00:00",
+    "updated_at": "2025-03-30T15:36:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0037",
+    "customer_id": "CUST-0024",
+    "product": "auto",
+    "asset_value": 160000.0,
+    "down_payment": 40000.0,
+    "term_months": 48,
+    "purpose": "Aquisição de veículo novo",
+    "created_at": "2026-01-12T10:47:00+00:00",
+    "updated_at": "2026-01-26T13:18:00+00:00",
+    "resolution": {
+      "outcome": "approved_with_conditions",
+      "rationale": "Comprometimento de renda acima da faixa de aprovação automática para veículo, compensado por score interno elevado e renda estável; aprovado com prazo ajustado.",
+      "policy_refs": [
+        "POL-005"
+      ],
+      "conditions": [
+        "Prazo ajustado para reduzir o comprometimento de renda"
+      ]
+    }
+  },
+  {
+    "_id": "APP-SEED-0038",
+    "customer_id": "CUST-0025",
+    "product": "mortgage",
+    "asset_value": 119000.0,
+    "down_payment": 47600.0,
+    "term_months": 300,
+    "purpose": "Aquisição de imóvel residencial próprio",
+    "created_at": "2025-05-22T17:17:00+00:00",
+    "updated_at": "2025-05-22T17:30:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0039",
+    "customer_id": "CUST-0025",
+    "product": "auto",
+    "asset_value": 35000.0,
+    "down_payment": 12250.0,
+    "term_months": 48,
+    "purpose": "Aquisição de veículo seminovo",
+    "created_at": "2025-07-10T10:40:00+00:00",
+    "updated_at": "2025-07-10T10:47:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0040",
+    "customer_id": "CUST-0025",
+    "product": "mortgage",
+    "asset_value": 620000.0,
+    "down_payment": 279000.0,
+    "term_months": 300,
+    "purpose": "Aquisição de apartamento para moradia",
+    "created_at": "2026-03-20T19:07:00+00:00",
+    "updated_at": "2026-03-30T21:07:00+00:00",
+    "resolution": {
+      "outcome": "approved",
+      "rationale": "Valor solicitado acima da alçada de aprovação automática, com LTV e comprometimento de renda dentro dos limites confortáveis e score interno elevado; aprovado sem condições adicionais.",
+      "policy_refs": [
+        "POL-020"
+      ],
+      "conditions": []
+    }
+  },
+  {
+    "_id": "APP-SEED-0041",
+    "customer_id": "CUST-0026",
+    "product": "auto",
+    "asset_value": 75000.0,
+    "down_payment": 26250.0,
+    "term_months": 48,
+    "purpose": "Troca de veículo por modelo mais novo",
+    "created_at": "2025-06-10T08:16:00+00:00",
+    "updated_at": "2025-06-10T08:20:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0042",
+    "customer_id": "CUST-0026",
+    "product": "mortgage",
+    "asset_value": 150000.0,
+    "down_payment": 33000.0,
+    "term_months": 300,
+    "purpose": "Troca por imóvel residencial maior",
+    "created_at": "2025-10-30T14:29:00+00:00",
+    "updated_at": "2025-11-03T17:12:00+00:00",
+    "resolution": {
+      "outcome": "approved",
+      "rationale": "LTV acima do limite de aprovação automática, compensado por score interno elevado e comprometimento de renda confortável; aprovado sem condições adicionais.",
+      "policy_refs": [
+        "POL-020"
+      ],
+      "conditions": []
+    }
+  },
+  {
+    "_id": "APP-SEED-0043",
+    "customer_id": "CUST-0027",
+    "product": "auto",
+    "asset_value": 29000.0,
+    "down_payment": 10150.0,
+    "term_months": 48,
+    "purpose": "Aquisição de primeiro veículo",
+    "created_at": "2025-08-21T10:03:00+00:00",
+    "updated_at": "2025-08-25T10:58:00+00:00",
+    "resolution": {
+      "outcome": "approved",
+      "rationale": "Renda não constava como comprovada no momento da simulação; cliente apresentou extratos bancários complementares e a comprovação foi validada pelo analista.",
+      "policy_refs": [
+        "POL-013"
+      ],
+      "conditions": []
+    }
+  },
+  {
+    "_id": "APP-SEED-0044",
+    "customer_id": "CUST-0028",
+    "product": "mortgage",
+    "asset_value": 150000.0,
+    "down_payment": 60000.0,
+    "term_months": 300,
+    "purpose": "Financiamento de imóvel residencial",
+    "created_at": "2025-02-14T17:26:00+00:00",
+    "updated_at": "2025-02-14T17:59:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0045",
+    "customer_id": "CUST-0028",
+    "product": "auto",
+    "asset_value": 115000.0,
+    "down_payment": 40250.0,
+    "term_months": 48,
+    "purpose": "Troca de veículo",
+    "created_at": "2025-07-23T09:06:00+00:00",
+    "updated_at": "2025-07-23T09:37:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0046",
+    "customer_id": "CUST-0028",
+    "product": "mortgage",
+    "asset_value": 440000.0,
+    "down_payment": 132000.0,
+    "term_months": 300,
+    "purpose": "Aquisição de casa para moradia da família",
+    "created_at": "2026-04-04T16:50:00+00:00",
+    "updated_at": "2026-04-15T19:07:00+00:00",
+    "resolution": {
+      "outcome": "approved_with_conditions",
+      "rationale": "Comprometimento de renda acima da faixa de aprovação automática, compensado por compartilhamento de ativos via Open Finance equivalente a mais de 20% do valor solicitado.",
+      "policy_refs": [
+        "POL-004",
+        "POL-016"
+      ],
+      "conditions": [
+        "Manutenção do compartilhamento de ativos via Open Finance durante a vigência do contrato"
+      ]
+    }
+  },
+  {
+    "_id": "APP-SEED-0047",
+    "customer_id": "CUST-0029",
+    "product": "auto",
+    "asset_value": 28000.0,
+    "down_payment": 9800.0,
+    "term_months": 36,
+    "purpose": "Aquisição de veículo novo",
+    "created_at": "2025-05-17T10:08:00+00:00",
+    "updated_at": "2025-05-17T10:34:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0048",
+    "customer_id": "CUST-0029",
+    "product": "mortgage",
+    "asset_value": 60000.0,
+    "down_payment": 24000.0,
+    "term_months": 120,
+    "purpose": "Aquisição de imóvel residencial próprio",
+    "created_at": "2025-10-21T16:44:00+00:00",
+    "updated_at": "2025-10-21T16:55:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0049",
+    "customer_id": "CUST-0030",
+    "product": "mortgage",
+    "asset_value": 96500.0,
+    "down_payment": 38600.0,
+    "term_months": 300,
+    "purpose": "Aquisição de apartamento para moradia",
+    "created_at": "2025-04-23T18:16:00+00:00",
+    "updated_at": "2025-04-23T18:39:00+00:00"
+  },
+  {
+    "_id": "APP-SEED-0050",
+    "customer_id": "CUST-0030",
+    "product": "auto",
+    "asset_value": 28500.0,
+    "down_payment": 9975.0,
+    "term_months": 48,
+    "purpose": "Aquisição de veículo seminovo",
+    "created_at": "2025-11-04T11:35:00+00:00",
+    "updated_at": "2025-11-04T11:43:00+00:00"
+  }
+]

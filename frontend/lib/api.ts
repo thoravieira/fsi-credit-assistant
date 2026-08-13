@@ -85,6 +85,7 @@ export interface CreditApplication {
   status?: string;
   latest_assessment?: { calc: CalcResult; decision: Decision } | null;
   final_decision?: Decision | null;
+  updated_at?: string;
 }
 
 export interface TraceEvent {
@@ -280,6 +281,33 @@ export const CUSTOMER_NAMES: Record<string, string> = {
   'CUST-0001': 'Mariana Duarte',
   'CUST-0002': 'Rafael Nascimento Souza',
   'CUST-0003': 'Eliane Cristina Ferreira',
+  'CUST-0004': 'Bruno Carvalho Lima',
+  'CUST-0005': 'Camila Ribeiro Alves',
+  'CUST-0006': 'Diego Fernandes Costa',
+  'CUST-0007': 'Patrícia Gomes Martins',
+  'CUST-0008': 'Thiago Almeida Rocha',
+  'CUST-0009': 'Juliana Barbosa Pinto',
+  'CUST-0010': 'Marcos Vinícius Teixeira',
+  'CUST-0011': 'Fernanda Cardoso Dias',
+  'CUST-0012': 'Rodrigo Santos Pereira',
+  'CUST-0013': 'Aline Cristina Souza',
+  'CUST-0014': 'Gustavo Henrique Moreira',
+  'CUST-0015': 'Larissa Mendes Azevedo',
+  'CUST-0016': 'Felipe Augusto Nogueira',
+  'CUST-0017': 'Beatriz Correia Lopes',
+  'CUST-0018': 'Leonardo Batista Cunha',
+  'CUST-0019': 'Renata Oliveira Castro',
+  'CUST-0020': 'Eduardo Ferreira Nunes',
+  'CUST-0021': 'Vanessa Lima Rezende',
+  'CUST-0022': 'Alexandre Pires Monteiro',
+  'CUST-0023': 'Débora Santana Ramos',
+  'CUST-0024': 'Paulo Roberto Andrade',
+  'CUST-0025': 'Isabela Rocha Guimarães',
+  'CUST-0026': 'Vinícius Martins Cavalcanti',
+  'CUST-0027': 'Tatiane Aparecida Silveira',
+  'CUST-0028': 'Ricardo Nunes Barreto',
+  'CUST-0029': 'Simone Cristina Vasconcelos',
+  'CUST-0030': 'André Luiz Ferreira Cordeiro',
 };
 
 export const PRODUCT_LABELS: Record<string, string> = {
