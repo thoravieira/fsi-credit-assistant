@@ -265,19 +265,19 @@ def test_tool_steps_and_tokens_are_forwarded_to_the_parent_stream():
     """
     script = [
         tool_call("check_open_finance_assets", "c1"),
-        AIMessage("A cliente pode compartilhar R$ 96.000,00 com liquidez D+1."),
+        AIMessage("O consentimento não foi concedido; nenhum saldo pode ser usado."),
     ]
     _update, events, _logged = _run(_state("o que ela pode compartilhar?"), script)
 
     steps = [e for e in events if "step" in e]
     assert [s["step"] for s in steps] == ["check_open_finance_assets"]
     assert steps[0]["node"] == "negotiation"
-    # Summed by Python, not by the model.
-    assert steps[0]["detail"]["liquid_balance"] == 96_000.0
     assert steps[0]["detail"]["consent_granted"] is False
+    assert "asset_count" not in steps[0]["detail"]
+    assert "liquid_balance" not in steps[0]["detail"]
 
     streamed = "".join(e["token"] for e in events if "token" in e)
-    assert streamed == "A cliente pode compartilhar R$ 96.000,00 com liquidez D+1."
+    assert streamed == "O consentimento não foi concedido; nenhum saldo pode ser usado."
 
 
 def test_saying_aprovar_produces_a_proposal_for_the_human_gate():

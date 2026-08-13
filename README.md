@@ -572,6 +572,9 @@ The API image does not bundle the repository-root `data/` directory, so perform 
 ## Demo walkthrough
 
 The seeded profiles and policies are designed for a two-persona demonstration.
+For a rehearsed 7–9 minute narrative with literal prompts, expected figures, audience
+questions, and the customer-to-analyst-to-contract arc, use the
+[`docs/demo-storytelling-pt.md`](docs/demo-storytelling-pt.md) runbook.
 
 ### Customer journey
 
@@ -611,6 +614,7 @@ The right-side frontend panel exposes the runtime trace so an audience can see w
 | `GET` | `/api/health` | Ping Atlas and report vector-index availability |
 | `POST` | `/api/chat` | Stream one customer or analyst turn over SSE |
 | `POST` | `/api/approve` | Resume an interrupted graph with the human verdict |
+| `POST` | `/api/contract` | Record customer acceptance without re-running credit assessment |
 
 ### Create an application
 
@@ -1029,6 +1033,7 @@ Expand system authority only after evidence, controls, and business metrics just
 ## Further documentation
 
 - [`docs/demo-overview-pt.md`](docs/demo-overview-pt.md) — concise Portuguese business overview
+- [`docs/demo-storytelling-pt.md`](docs/demo-storytelling-pt.md) — rehearsed Portuguese demo narrative with literal prompts and expected outcomes
 - [`docs/specs/00-overview.md`](docs/specs/00-overview.md) — scope and system overview
 - [`docs/specs/01-architecture.md`](docs/specs/01-architecture.md) — architecture decisions
 - [`docs/specs/02-data-model.md`](docs/specs/02-data-model.md) — collections and document shapes

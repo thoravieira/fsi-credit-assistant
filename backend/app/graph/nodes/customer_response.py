@@ -75,4 +75,4 @@ def customer_response(state: AgentState, *, llm: BaseChatModel | None = None) ->
         [SystemMessage(_SYSTEM_PROMPT), HumanMessage(f"{instruction}\n\n{context}")]
     )
     text = response.content if isinstance(response.content, str) else str(response.content)
-    return {"messages": [AIMessage(text)]}
+    return {"messages": [AIMessage(text, additional_kwargs={"persona": "customer"})]}

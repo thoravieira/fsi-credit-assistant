@@ -18,6 +18,8 @@ agent's own rationale, framed by figures the calculator produced.
 
 from datetime import datetime, timezone
 
+from langchain_core.messages import AIMessage
+
 from app.audit import append_event
 from app.config import DEMO_ANALYST_ID
 from app.db import get_db
@@ -91,7 +93,17 @@ def persist_decision(state: AgentState) -> dict:
     _write_precedent(final_application, profile, calc, decision, now)
     _write_memories(final_application, profile, calc, decision, now)
 
-    return {"stage": "closed", "application": final_application}
+    notification = (
+        "Sua proposta foi aprovada. Confira abaixo as condições finais e, se estiver de acordo, "
+        "prossiga com a contratação."
+        if outcome in {"approved", "approved_with_conditions"}
+        else "A análise foi concluída e a proposta não foi aprovada. Consulte os motivos abaixo."
+    )
+    return {
+        "stage": "closed",
+        "application": final_application,
+        "messages": [AIMessage(notification, additional_kwargs={"persona": "customer"})],
+    }
 
 
 def _application_for_scenario(application: dict, scenario: dict) -> dict:

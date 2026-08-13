@@ -12,6 +12,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 from langchain_core.language_models.fake_chat_models import FakeListChatModel
+from langchain_core.messages import AIMessage, HumanMessage
 
 from app.db import get_db
 from app.graph.nodes.intake import _ExtractedFields
@@ -367,6 +368,61 @@ def test_chat_hydrates_the_application_from_the_thread_id(chat_thread):
     doc = get_db()["applications"].find_one({"_id": chat_thread})
     assert doc["status"] == "manual_review"
     assert doc["latest_assessment"]["decision"]["outcome"] == "manual_review"
+
+
+def test_contract_keeps_the_human_verdict_and_filters_customer_history(chat_thread):
+    _chat(chat_thread, "Simular a proposta.", answer="A proposta seguirá para análise manual.")
+    final_decision = {
+        "outcome": "approved",
+        "policy_refs": ["POL-020", "POL-004"],
+        "scenario": {
+            "inputs": {
+                "asset_value": 326_795.20,
+                "amount": 226_795.20,
+                "down_payment": 100_000.0,
+                "term_months": 360,
+            },
+            "calc": {"ltv": 0.694, "dti": 0.30, "monthly_payment": 2_009.99},
+        },
+    }
+    get_db()["applications"].update_one(
+        {"_id": chat_thread},
+        {"$set": {"status": "approved", "final_decision": final_decision}},
+    )
+
+    with TestClient(app) as running_client:
+        graph = running_client.app.state.graph
+        graph.update_state(
+            {"configurable": {"thread_id": chat_thread}},
+            {
+                "messages": [
+                    HumanMessage("Pergunta interna.", additional_kwargs={"persona": "analyst"}),
+                    AIMessage("Parecer interno.", additional_kwargs={"persona": "analyst"}),
+                ]
+            },
+        )
+
+        response = running_client.post("/api/contract", json={"thread_id": chat_thread})
+        assert response.status_code == 200
+        second = running_client.post("/api/contract", json={"thread_id": chat_thread})
+        assert second.status_code == 200
+
+        customer_history = running_client.get(
+            f"/api/history/{chat_thread}", params={"persona": "customer"}
+        ).json()["messages"]
+        analyst_history = running_client.get(
+            f"/api/history/{chat_thread}", params={"persona": "analyst"}
+        ).json()["messages"]
+
+    persisted = get_db()["applications"].find_one({"_id": chat_thread})
+    assert persisted["status"] == "approved"
+    assert persisted["final_decision"] == final_decision
+    assert persisted["contract_status"] == "contracted"
+    assert persisted["contracted_at"] is not None
+    assert all("intern" not in message["text"].lower() for message in customer_history)
+    assert [message["text"] for message in analyst_history] == ["Pergunta interna.", "Parecer interno."]
+    assert sum("Aceito contratar" in message["text"] for message in customer_history) == 1
+    assert sum("Aceite registrado" in message["text"] for message in customer_history) == 1
 
 
 def test_trace_endpoint_returns_the_persisted_events(chat_thread):

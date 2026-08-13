@@ -26,7 +26,7 @@ export interface UseAgentStreamResult {
   isStreaming: boolean;
   send: (message: string) => Promise<void>;
   hydrate: (data: { messages: ChatMessage[]; decision?: Decision | null }) => void;
-  markContracted: (messageId: string) => void;
+  markContracted: (messageId: string, contracted?: boolean) => void;
 }
 
 /**
@@ -153,8 +153,8 @@ export function useAgentStream(threadId: string, persona: Persona): UseAgentStre
     if (data.decision !== undefined) setDecision(data.decision);
   }, []);
 
-  const markContracted = useCallback((messageId: string) => {
-    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, contracted: true } : m)));
+  const markContracted = useCallback((messageId: string, contracted = true) => {
+    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, contracted } : m)));
   }, []);
 
   return { trace, messages, calc, decision, pendingApproval, scenarios, isStreaming, send, hydrate, markContracted };

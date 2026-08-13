@@ -17,6 +17,8 @@
 | `GET` | `/api/applications?status=manual_review` | Carlos's queue |
 | `GET` | `/api/applications/{id}` | Case detail + latest assessment |
 | `POST` | `/api/approve` | Resume the `interrupt()` with `Command(resume={...})` |
+| `POST` | `/api/contract` | Persist customer acceptance without re-running the assessment graph |
+| `GET` | `/api/history/{thread_id}?persona=customer` | Persona-filtered checkpoint transcript |
 | `GET` | `/api/trace/{thread_id}` | Historical trace from `decisions_log` |
 | `GET` | `/api/health` | Atlas ping + index status |
 

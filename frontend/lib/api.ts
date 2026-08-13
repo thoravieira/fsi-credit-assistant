@@ -89,6 +89,8 @@ export interface CreditApplication {
   status?: string;
   latest_assessment?: { calc: CalcResult; decision: Decision } | null;
   final_decision?: Decision | null;
+  contract_status?: 'contracted';
+  contracted_at?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -209,11 +211,28 @@ export interface HistoryMessage {
 // `final_decision` only ever hold the *last* snapshot of each producer, so a
 // case that has been both auto-assessed and analyst-approved, then
 // re-simulated, needs its own current-vs-stale check — see `currentDecisionOf`.
-export async function getHistory(threadId: string): Promise<HistoryMessage[]> {
-  const res = await fetch(`${BASE_URL}/api/history/${encodeURIComponent(threadId)}`);
+export async function getHistory(threadId: string, persona?: Persona): Promise<HistoryMessage[]> {
+  const params = new URLSearchParams();
+  if (persona) params.set('persona', persona);
+  const qs = params.toString();
+  const res = await fetch(`${BASE_URL}/api/history/${encodeURIComponent(threadId)}${qs ? '?' + qs : ''}`);
   if (!res.ok) throw new Error(`/api/history/${threadId} failed: ${res.status}`);
   const body = await res.json();
   return (body.messages ?? []) as HistoryMessage[];
+}
+
+export async function contractApplication(threadId: string): Promise<{
+  thread_id: string;
+  contract_status: 'contracted';
+  contracted_at: string;
+}> {
+  const res = await fetch(`${BASE_URL}/api/contract`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ thread_id: threadId }),
+  });
+  if (!res.ok) throw new Error(`/api/contract failed: ${res.status}`);
+  return res.json();
 }
 
 // `applications.status` is the one field both producers (the automatic

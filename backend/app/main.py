@@ -17,7 +17,7 @@ from typing import AsyncIterator, Literal
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import AIMessageChunk, HumanMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage
 from langgraph.types import Command
 from pydantic import BaseModel
 
@@ -44,6 +44,10 @@ class ChatRequest(BaseModel):
 class ApproveRequest(BaseModel):
     thread_id: str
     resume: dict
+
+
+class ContractRequest(BaseModel):
+    thread_id: str
 
 
 @asynccontextmanager
@@ -120,6 +124,81 @@ def get_application(application_id: str):
     return doc
 
 
+def _current_decision(row: dict) -> dict | None:
+    """Return only the decision that matches the application's live status."""
+    status = row.get("status")
+    final = row.get("final_decision") or {}
+    assessment = (row.get("latest_assessment") or {}).get("decision") or {}
+    if final.get("outcome") == status:
+        return final
+    if assessment.get("outcome") == status:
+        return assessment
+    return None
+
+
+@app.post("/api/contract")
+async def contract_application(body: ContractRequest, request: Request):
+    """Record customer acceptance without re-running credit assessment.
+
+    Contracting is a business transition after a positive decision, not a new
+    natural-language simulation. Sending it through `/api/chat` used to run
+    the customer graph again, replace the human verdict with `auto_approved`,
+    and make the button reappear after a reload.
+    """
+    db = get_db()
+    row = db["applications"].find_one({"_id": body.thread_id})
+    if row is None:
+        raise HTTPException(status_code=404, detail="application not found")
+
+    decision = _current_decision(row)
+    if not decision or decision.get("outcome") not in {
+        "auto_approved",
+        "approved",
+        "approved_with_conditions",
+    }:
+        raise HTTPException(status_code=409, detail="application has no current approved proposal")
+
+    if row.get("contracted_at"):
+        return {
+            "thread_id": body.thread_id,
+            "contract_status": "contracted",
+            "contracted_at": row["contracted_at"],
+        }
+
+    accepted_text = "Aceito contratar esta proposta e seguir com a formalização do financiamento."
+    confirmation_text = (
+        "Aceite registrado. A proposta aprovada segue agora para formalização; "
+        "a análise documental e a assinatura ocorrerão pelos canais oficiais."
+    )
+    config = {"configurable": {"thread_id": body.thread_id}}
+    await request.app.state.graph.aupdate_state(
+        config,
+        {
+            "messages": [
+                HumanMessage(accepted_text, additional_kwargs={"persona": "customer"}),
+                AIMessage(confirmation_text, additional_kwargs={"persona": "customer"}),
+            ]
+        },
+    )
+
+    now = datetime.now(timezone.utc)
+    db["applications"].update_one(
+        {"_id": body.thread_id},
+        {
+            "$set": {
+                "contract_status": "contracted",
+                "contracted_at": now,
+                "updated_at": now,
+            }
+        },
+    )
+    return {
+        "thread_id": body.thread_id,
+        "contract_status": "contracted",
+        "contracted_at": now,
+    }
+
+
 def _message_text(message) -> str:
     """Same text-extraction rule as `agent/negotiation.py`'s `_text` — content
     is a plain string for ordinary turns, or a list of content-block dicts for
@@ -134,24 +213,34 @@ def _message_text(message) -> str:
 
 
 @app.get("/api/history/{thread_id}")
-async def get_history(thread_id: str, request: Request):
+async def get_history(
+    thread_id: str, request: Request, persona: Literal["customer", "analyst"] | None = None
+):
     """The real conversation for a thread, read back from the LangGraph
     checkpoint — the only durable copy of it. `decisions_log` (`/api/trace`)
     is a structured audit trail of *events*, not the prose turns themselves;
     `applications` carries only the latest snapshot. Only human/AI turns are
-    returned: `AgentState.messages` never carries a bare SystemMessage or a
-    deep-agent tool-call message (`agent/negotiation.py`'s `_map_result` only
-    ever appends the agent's final answer), so no filtering beyond message
-    type is needed to keep this to what the customer or analyst actually saw.
+    returned, and an optional persona filter prevents the customer experience
+    from exposing the analyst's internal negotiation on the shared thread.
     """
     graph = request.app.state.graph
     config = {"configurable": {"thread_id": thread_id}}
     snapshot = await graph.aget_state(config)
     raw_messages = snapshot.values.get("messages") or []
 
+    has_persona_tags = any(
+        (getattr(message, "additional_kwargs", {}) or {}).get("persona")
+        for message in raw_messages
+    )
     messages = []
     for message in raw_messages:
         if message.type not in ("human", "ai"):
+            continue
+        message_persona = (getattr(message, "additional_kwargs", {}) or {}).get("persona")
+        # New checkpoints tag every visible turn. If a legacy checkpoint has
+        # no tags at all, preserve the old all-messages response; once tags
+        # exist, never leak Carlos's internal negotiation into Mariana's app.
+        if persona and has_persona_tags and message_persona != persona:
             continue
         text = _message_text(message)
         if not text:
@@ -356,7 +445,10 @@ async def stream_chat_events(
     parallel branches.
     """
     config = {"configurable": {"thread_id": thread_id}}
-    payload = {"persona": persona, "messages": [HumanMessage(message)]}
+    payload = {
+        "persona": persona,
+        "messages": [HumanMessage(message, additional_kwargs={"persona": persona})],
+    }
 
     snapshot = await graph.aget_state(config)
     row = get_db()["applications"].find_one({"_id": thread_id})

@@ -223,7 +223,10 @@ def _map_result(state: AgentState, result: dict, case: NegotiationCase) -> dict:
     answer = _final_text(result)
     _log_scenarios(state, case)
 
-    update: dict = {"messages": [AIMessage(answer)], "scenarios": case.simulated}
+    update: dict = {
+        "messages": [AIMessage(answer, additional_kwargs={"persona": "analyst"})],
+        "scenarios": case.simulated,
+    }
 
     application = state.get("application") or {}
     # Item 10 — a case already decided can't be re-proposed for approval,

@@ -73,4 +73,7 @@ def analyst_brief(state: AgentState, *, llm: BaseChatModel | None = None) -> dic
             rationale=text,
         )
 
-    return {"messages": [AIMessage(text)], "stage": "negotiation"}
+    return {
+        "messages": [AIMessage(text, additional_kwargs={"persona": "analyst"})],
+        "stage": "negotiation",
+    }

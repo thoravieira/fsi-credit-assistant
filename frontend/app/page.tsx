@@ -10,7 +10,8 @@ import type { FocusState } from '../components/ArchitecturePanel';
 import { Drawer, type DrawerState } from '../components/Drawer';
 import { laneCardId } from '../lib/archMeta';
 import {
-  createApplication, currentDecisionOf, fmtBRL, getApplication, getHistory, listApplications, previewFinanced, previewLtv,
+  contractApplication, createApplication, currentDecisionOf, fmtBRL, getApplication, getHistory,
+  listApplications, previewFinanced, previewLtv,
 } from '../lib/api';
 import type { ChatMessage } from '../hooks/useAgentStream';
 import type { Product } from '../lib/api';
@@ -179,17 +180,23 @@ export default function CustomerPage() {
     if (!threadId || historyLoading) return null;
     setHistoryLoading(true);
     try {
-      const [pastMessages, app] = await Promise.all([getHistory(threadId), getApplication(threadId)]);
+      const [pastMessages, app] = await Promise.all([
+        getHistory(threadId, 'customer'),
+        getApplication(threadId),
+      ]);
       const chatMessages: ChatMessage[] = pastMessages.map((m, i) => ({ id: 'h-' + i, role: m.role, text: m.text }));
       const decision = currentDecisionOf(app);
-      hydrate({ messages: chatMessages, decision });
-      setFocus(null);
-      setDrawer(null);
-      setFormOpen(false);
       // Same best-effort attachment `hydrate()` uses internally (SDD 12
       // follow-up): a past decision has no id of its own, so "the message
       // carrying it" is the last assistant turn, once one exists.
       const lastAssistantIdx = chatMessages.reduce((acc, m, i) => (m.role === 'assistant' ? i : acc), -1);
+      if (app.contract_status === 'contracted' && lastAssistantIdx >= 0) {
+        chatMessages[lastAssistantIdx] = { ...chatMessages[lastAssistantIdx], contracted: true };
+      }
+      hydrate({ messages: chatMessages, decision });
+      setFocus(null);
+      setDrawer(null);
+      setFormOpen(false);
       return { app, decisionMessageId: decision && lastAssistantIdx >= 0 ? chatMessages[lastAssistantIdx].id : null };
     } finally {
       setHistoryLoading(false);
@@ -211,14 +218,19 @@ export default function CustomerPage() {
     }
   };
 
-  // "Contratar" (item 6): a real chat turn, not a local-only flag — it goes
-  // through the same `/api/chat` pipeline as any message, so it lands in the
-  // LangGraph checkpoint and survives a history reload. `markContracted`
-  // flips the button to its confirmed state immediately rather than waiting
-  // for the round trip, since the outcome here is never in doubt.
-  const onContract = (m: ChatMessage) => {
+  // Contract acceptance is a business transition, not another simulation.
+  // The dedicated endpoint records it in MongoDB and appends a deterministic
+  // customer-visible confirmation to the checkpoint without re-running the
+  // credit graph (which would replace the analyst's verdict).
+  const onContract = async (m: ChatMessage) => {
+    if (!threadId) return;
     markContracted(m.id);
-    sendAndReset('Aceito contratar esta proposta e seguir com a formalização do financiamento.');
+    try {
+      await contractApplication(threadId);
+      await openHistory();
+    } catch {
+      markContracted(m.id, false);
+    }
   };
 
   return (

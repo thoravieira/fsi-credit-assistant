@@ -330,13 +330,13 @@ def _simulate(
 
 @tool(
     description=(
-        "Consulta os ativos que a cliente pode compartilhar via Open Finance e se o "
-        "consentimento já foi concedido. Use quando o caso não fechar pelos números e um "
-        "mitigante de risco puder sustentar a decisão."
+        "Verifica o consentimento de Open Finance e, somente quando ele já foi concedido, "
+        "consulta os ativos compartilhados pela cliente. Use quando o caso não fechar pelos "
+        "números e um mitigante de risco puder sustentar a decisão."
     )
 )
 def check_open_finance_assets(runtime: ToolRuntime[NegotiationCase]) -> dict:
-    """Report the customer's shareable Open Finance assets. Read-only.
+    """Report consent and, only when granted, the customer's shared assets. Read-only.
 
     Takes no arguments: there is exactly one customer in a negotiation and they
     arrive in runtime context, so the model has no opportunity to name someone
@@ -353,23 +353,26 @@ def check_open_finance_assets(runtime: ToolRuntime[NegotiationCase]) -> dict:
     open_finance = case.profile.get("open_finance") or {}
     assets = open_finance.get("shareable_assets") or []
 
-    # Summed here rather than by the model, for the same reason as everything
-    # else in this file.
-    total = sum(float(a.get("balance", 0.0)) for a in assets)
+    consent_granted = bool(open_finance.get("consent_granted", False))
+    # Without explicit consent, neither the model nor the live trace receives
+    # balances or even an asset count. The profile may contain synthetic
+    # fixtures, but their presence is not authorization to disclose them.
+    visible_assets = assets if consent_granted else []
+    total = sum(float(a.get("balance", 0.0)) for a in visible_assets)
     liquid = sum(
-        float(a.get("balance", 0.0)) for a in assets if a.get("liquidity") in ("d_plus_0", "d_plus_1")
+        float(a.get("balance", 0.0))
+        for a in visible_assets
+        if a.get("liquidity") in ("d_plus_0", "d_plus_1")
     )
 
     result = {
-        "consent_granted": bool(open_finance.get("consent_granted", False)),
-        "shareable_assets": assets,
+        "consent_granted": consent_granted,
+        "shareable_assets": visible_assets,
         "total_balance": total,
         "liquid_balance": liquid,
     }
-    case.step(
-        "check_open_finance_assets",
-        consent_granted=result["consent_granted"],
-        asset_count=len(assets),
-        liquid_balance=liquid,
-    )
+    detail = {"consent_granted": consent_granted}
+    if consent_granted:
+        detail.update(asset_count=len(visible_assets), liquid_balance=liquid)
+    case.step("check_open_finance_assets", **detail)
     return result
