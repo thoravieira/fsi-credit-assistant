@@ -444,6 +444,26 @@ def test_decision_updates_the_application_row(application_row):
     assert doc["term_months"] == 360
 
 
+def test_new_assessment_invalidates_a_prior_contract(application_row):
+    get_db()["applications"].update_one(
+        {"_id": application_row},
+        {
+            "$set": {
+                "final_decision": {"outcome": "approved"},
+                "contract_status": "contracted",
+                "contracted_at": "2026-08-13T12:00:00Z",
+            }
+        },
+    )
+
+    _assessed(application_row, asset_value=400_000.0, down_payment=100_000.0)
+
+    doc = get_db()["applications"].find_one({"_id": application_row})
+    assert "final_decision" not in doc
+    assert "contract_status" not in doc
+    assert "contracted_at" not in doc
+
+
 def test_decision_seq_increments_across_resimulations(application_row):
     """Mariana re-simulating on the same thread appends, never overwrites — the
     trace panel reads `decisions_log` in `seq` order.

@@ -38,10 +38,14 @@ def decision(state: AgentState) -> dict:
                 "updated_at": now,
                 "latest_assessment": {"calc": calc, "decision": result},
             },
-            # A new assessment supersedes a prior human resolution. The audit
-            # log keeps history; leaving final_decision on the live row would
-            # make the customer notification and analyst dossier ambiguous.
-            "$unset": {"final_decision": ""},
+            # A new assessment supersedes both a prior human resolution and
+            # any acceptance of that old proposal. The audit log keeps the
+            # history, while the live row must describe only the new offer.
+            "$unset": {
+                "final_decision": "",
+                "contract_status": "",
+                "contracted_at": "",
+            },
         },
     )
 
