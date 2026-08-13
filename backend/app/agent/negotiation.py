@@ -47,7 +47,12 @@ from app.domain.formatting import brl, percent
 from app.graph.prompts import load_prompt
 from app.graph.state import AgentState
 from app.graph.tools.case import NegotiationCase
-from app.graph.tools.scenario import check_open_finance_assets, recalculate_scenario, solve_for_target_dti
+from app.graph.tools.scenario import (
+    check_open_finance_assets,
+    recalculate_scenario,
+    solve_for_target_dti,
+    solve_term_for_target_dti,
+)
 from app.llm import get_chat_model
 from app.memory.store import get_store
 
@@ -66,7 +71,12 @@ def get_negotiation_agent() -> CompiledStateGraph:
     """
     return create_deep_agent(
         model=get_chat_model(),
-        tools=[recalculate_scenario, solve_for_target_dti, check_open_finance_assets],
+        tools=[
+            recalculate_scenario,
+            solve_for_target_dti,
+            solve_term_for_target_dti,
+            check_open_finance_assets,
+        ],
         system_prompt=load_prompt("negotiation"),
         subagents=[POLICY_RESEARCHER, PRECEDENT_ANALYST],
         context_schema=NegotiationCase,

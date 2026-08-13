@@ -66,6 +66,7 @@ def customer_response(state: AgentState, *, llm: BaseChatModel | None = None) ->
         context = (
             f"Pergunta/mensagem da cliente nesta rodada: {question!r}\n"
             f"Cálculo: {state.get('calc')}\n"
+            f"Contexto da resolução solicitada: {state.get('calculation_context')}\n"
             f"Decisão: {state.get('decision')}\n"
             f"Políticas citadas: {state.get('policies')}"
         )

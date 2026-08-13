@@ -38,12 +38,16 @@ export interface ScenarioResumo {
 }
 
 export interface Scenario {
-  inputs: { amount: number; down_payment: number; term_months: number; annual_rate: number };
+  inputs: { asset_value?: number; amount: number; down_payment: number; term_months: number; annual_rate: number };
   calc: CalcResult;
   resumo: ScenarioResumo;
   outcome: Outcome;
   policy_refs: string[];
   reasons: string[];
+  feasible?: boolean;
+  target_dti?: number;
+  constraint?: string;
+  infeasible_reason?: string | null;
 }
 
 // Two producers, one shape (SDD 04 §2): the customer path's `domain/rules.py`
@@ -85,6 +89,7 @@ export interface CreditApplication {
   status?: string;
   latest_assessment?: { calc: CalcResult; decision: Decision } | null;
   final_decision?: Decision | null;
+  created_at?: string;
   updated_at?: string;
 }
 
@@ -183,8 +188,8 @@ export async function listApplications(filter?: { status?: string; customerId?: 
   const res = await fetch(`${BASE_URL}/api/applications${qs ? '?' + qs : ''}`);
   if (!res.ok) throw new Error(`/api/applications failed: ${res.status}`);
   const body = await res.json();
-  // Server sorts by `created_at` desc — callers that want "the customer's
-  // current case" can just take index 0.
+  // Server sorts by latest activity (`updated_at`) so customer and analyst
+  // views both open the case that was actually touched most recently.
   return ((body.applications ?? []) as Record<string, any>[]).map(normalizeApplication);
 }
 

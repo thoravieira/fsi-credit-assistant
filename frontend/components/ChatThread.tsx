@@ -135,7 +135,7 @@ export function ChatInputBar({
 
   if (large) {
     return (
-      <div className="flex items-end gap-2">
+      <div className="flex w-full items-end gap-2">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -148,9 +148,9 @@ export function ChatInputBar({
           disabled={disabled}
           placeholder={placeholder}
           rows={3}
-          className="min-h-[72px] flex-1 resize-none border border-[rgba(0,30,43,0.2)] bg-white px-4 py-3 text-[13px] outline-none focus:border-forest disabled:opacity-60"
+          className="min-h-[72px] min-w-0 flex-1 resize-none border border-[rgba(0,30,43,0.2)] bg-white px-4 py-3 text-[13px] outline-none focus:border-forest disabled:opacity-60"
         />
-        <button onClick={() => submit()} disabled={disabled} className="self-end border-none bg-ink px-4 py-3 text-[12.5px] font-bold text-white disabled:opacity-40">
+        <button onClick={() => submit()} disabled={disabled} className="flex-none self-end border-none bg-ink px-4 py-3 text-[12.5px] font-bold text-white disabled:opacity-40">
           Enviar
         </button>
       </div>

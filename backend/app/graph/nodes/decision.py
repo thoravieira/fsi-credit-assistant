@@ -28,10 +28,20 @@ def decision(state: AgentState) -> dict:
         {"_id": application_id},
         {
             "$set": {
+                "product": application["product"],
+                "asset_value": application["asset_value"],
+                "down_payment": application["down_payment"],
+                "requested_amount": application["requested_amount"],
+                "term_months": application["term_months"],
+                "purpose": application.get("purpose", ""),
                 "status": result["outcome"],
                 "updated_at": now,
                 "latest_assessment": {"calc": calc, "decision": result},
-            }
+            },
+            # A new assessment supersedes a prior human resolution. The audit
+            # log keeps history; leaving final_decision on the live row would
+            # make the customer notification and analyst dossier ambiguous.
+            "$unset": {"final_decision": ""},
         },
     )
 

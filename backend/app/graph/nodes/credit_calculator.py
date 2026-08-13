@@ -19,13 +19,36 @@ from app.domain.rules import POLICIES, age_at_maturity
 from app.graph.state import AgentState, CalcResult
 
 
-def _solve_financed(application: dict, policy, net_income: float, existing_debt: float, score: int) -> None:
+def _limits(policy, *, manual: bool) -> tuple[float, float, float]:
+    if manual:
+        return (
+            policy.dti_absolute_limit.value,
+            policy.ltv_absolute_limit.value,
+            policy.amount_manual_approval_limit.value,
+        )
+    return (
+        policy.dti_auto_approval_limit.value,
+        policy.ltv_auto_approval_limit.value,
+        policy.amount_auto_approval_limit.value,
+    )
+
+
+def _solve_financed(
+    application: dict,
+    policy,
+    net_income: float,
+    existing_debt: float,
+    score: int,
+    *,
+    manual: bool = False,
+) -> None:
     """"Qual o máximo que eu consigo dando X de entrada?" — down payment and
     term are fixed; `asset_value = financed + down_payment` is implied, not
-    given. "pré-aprovado" means clearing the *auto-approval* band (POL-020/
-    021), so this — like the other three solves below — always targets that
-    band, never the wider manual-review one.
+    given. "pré-aprovado" targets the automatic band; an explicit request for
+    approval manual switches to the wider absolute limits and the analyst's
+    amount authority from POL-020/021.
     """
+    dti_limit, ltv_limit, amount_limit = _limits(policy, manual=manual)
     financed = max_financeable(
         product=application["product"],
         down_payment=application["down_payment"],
@@ -33,9 +56,9 @@ def _solve_financed(application: dict, policy, net_income: float, existing_debt:
         net_income=net_income,
         existing_debt=existing_debt,
         score=score,
-        dti_limit=policy.dti_auto_approval_limit.value,
-        ltv_limit=policy.ltv_auto_approval_limit.value,
-        amount_limit=policy.amount_auto_approval_limit.value,
+        dti_limit=dti_limit,
+        ltv_limit=ltv_limit,
+        amount_limit=amount_limit,
     )
     application["requested_amount"] = financed
     application["asset_value"] = financed + application["down_payment"]
@@ -61,7 +84,16 @@ def _solve_down_payment(application: dict, policy, net_income: float, existing_d
     application["down_payment"] = application["asset_value"] - financed
 
 
-def _solve_financed_max_term(application: dict, policy, profile: dict, net_income: float, existing_debt: float, score: int) -> None:
+def _solve_financed_max_term(
+    application: dict,
+    policy,
+    profile: dict,
+    net_income: float,
+    existing_debt: float,
+    score: int,
+    *,
+    manual: bool = False,
+) -> None:
     """"Qual o valor máximo que eu consigo financiar, com o prazo máximo?" — a
     compound ask: down payment is fixed, but unlike `_solve_financed`, the
     term is *not* a fact already sitting on the application either — it must
@@ -79,6 +111,7 @@ def _solve_financed_max_term(application: dict, policy, profile: dict, net_incom
     if max_term <= 0:
         return
     application["term_months"] = max_term
+    dti_limit, ltv_limit, amount_limit = _limits(policy, manual=manual)
     financed = max_financeable(
         product=application["product"],
         down_payment=application["down_payment"],
@@ -86,9 +119,9 @@ def _solve_financed_max_term(application: dict, policy, profile: dict, net_incom
         net_income=net_income,
         existing_debt=existing_debt,
         score=score,
-        dti_limit=policy.dti_auto_approval_limit.value,
-        ltv_limit=policy.ltv_auto_approval_limit.value,
-        amount_limit=policy.amount_auto_approval_limit.value,
+        dti_limit=dti_limit,
+        ltv_limit=ltv_limit,
+        amount_limit=amount_limit,
     )
     application["requested_amount"] = financed
     application["asset_value"] = financed + application["down_payment"]
@@ -145,15 +178,42 @@ def credit_calculator(state: AgentState) -> dict:
     # never survives past this node either way.
     intent = application.pop("_intent", None)
     solver = _SOLVERS.get(intent)
-    if solver or intent in ("solve_term_min", "solve_term_max", "solve_financed_max_term"):
+    if solver or intent in (
+        "solve_term_min",
+        "solve_term_max",
+        "solve_financed_max_term",
+        "solve_financed_manual",
+        "solve_financed_manual_max_term",
+    ):
         policy = POLICIES[application["product"]]
         if solver:
             solver(application, policy, net_income, existing_debt, score)
-        elif intent == "solve_financed_max_term":
-            _solve_financed_max_term(application, policy, profile, net_income, existing_debt, score)
+        elif intent in ("solve_financed_max_term", "solve_financed_manual_max_term"):
+            _solve_financed_max_term(
+                application,
+                policy,
+                profile,
+                net_income,
+                existing_debt,
+                score,
+                manual=intent == "solve_financed_manual_max_term",
+            )
+        elif intent == "solve_financed_manual":
+            _solve_financed(
+                application, policy, net_income, existing_debt, score, manual=True
+            )
         else:
             _solve_term(application, policy, profile, net_income, existing_debt, score, want=intent.removeprefix("solve_term_"))
         result["application"] = application
+
+    result["calculation_context"] = {
+        "intent": intent or "update",
+        "approval_band": (
+            "manual"
+            if intent and "manual" in intent
+            else "automatic" if intent and intent.startswith("solve_") else None
+        ),
+    }
 
     calc: CalcResult = compute_scenario(
         product=application["product"],

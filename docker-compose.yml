@@ -6,8 +6,8 @@
 services:
   api:
     build:
-      context: ./backend
-      dockerfile: ../Dockerfile.api
+      context: .
+      dockerfile: Dockerfile.api
     env_file:
       - ./.env
     ports:

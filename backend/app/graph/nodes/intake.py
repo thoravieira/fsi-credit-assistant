@@ -33,6 +33,12 @@ _SYSTEM_PROMPT = (
     "forem pedidas juntas — o prazo máximo nunca é um número já mencionado "
     "antes na conversa, é obtido da política. A entrada é o dado fixo; "
     "financiamento e prazo são as incógnitas.\n"
+    "- 'solve_financed_manual': pergunta o valor MÁXIMO que a cliente consegue "
+    "na faixa de APROVAÇÃO MANUAL (não automática), dado um valor de entrada e "
+    "prazo definidos. Use quando ela disser 'sem aprovação automática', 'com "
+    "aprovação manual' ou equivalente.\n"
+    "- 'solve_financed_manual_max_term': como 'solve_financed_manual', mas a "
+    "mensagem também pede o PRAZO MÁXIMO; financiamento e prazo são incógnitas.\n"
     "- 'solve_down_payment': pergunta a MENOR entrada que precisa dar, mantendo "
     "o mesmo valor do imóvel/veículo e prazo (ex.: \"qual a menor entrada para "
     "o mesmo valor e prazo?\"). O valor do bem e o prazo são fixos; a entrada é "
@@ -55,7 +61,14 @@ class _ExtractedFields(BaseModel):
     term_months: int | None = None
     purpose: str | None = None
     intent: Literal[
-        "update", "solve_financed", "solve_financed_max_term", "solve_down_payment", "solve_term_min", "solve_term_max"
+        "update",
+        "solve_financed",
+        "solve_financed_max_term",
+        "solve_financed_manual",
+        "solve_financed_manual_max_term",
+        "solve_down_payment",
+        "solve_term_min",
+        "solve_term_max",
     ] = "update"
 
 
@@ -67,11 +80,13 @@ class _ExtractedFields(BaseModel):
 # item 2 — "faça perguntas adicionais para ter todos os 4 dados").
 _SOLVE_REQUIRES: dict[str, tuple[str, ...]] = {
     "solve_financed": ("down_payment", "term_months"),
+    "solve_financed_manual": ("down_payment", "term_months"),
     # No `term_months` here on purpose: the term is the second unknown this
     # intent solves for (from the policy's age ceiling), not a fact it needs
     # already on the application — requiring it would make a stale prior term
     # block the fallthrough to plain `update` instead of fixing it.
     "solve_financed_max_term": ("down_payment",),
+    "solve_financed_manual_max_term": ("down_payment",),
     "solve_down_payment": ("asset_value", "term_months"),
     "solve_term_min": ("asset_value", "down_payment"),
     "solve_term_max": ("asset_value", "down_payment"),

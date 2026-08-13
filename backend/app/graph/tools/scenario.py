@@ -10,11 +10,19 @@ what a reader reads. Keeping them separate is why the model-facing text is
 Portuguese while the module stays English (CLAUDE.md).
 """
 
+from datetime import date
+
 from langchain.tools import ToolRuntime, tool
 
-from app.domain.calculator import compute_scenario, max_financeable_fixed_asset
+from app.domain.calculator import (
+    compute_scenario,
+    max_financeable,
+    max_financeable_fixed_asset,
+    max_term_by_age,
+    term_bounds,
+)
 from app.domain.formatting import brl, percent
-from app.domain.rules import evaluate
+from app.domain.rules import POLICIES, age_at_maturity, evaluate
 from app.graph.tools.case import NegotiationCase
 
 
@@ -85,6 +93,7 @@ def solve_for_target_dti(
     runtime: ToolRuntime[NegotiationCase],
     dti_target: float,
     term_months: int | None = None,
+    keep_down_payment: bool = False,
 ) -> dict:
     """The exact inverse of `recalculate_scenario` for a target DTI.
 
@@ -94,11 +103,10 @@ def solve_for_target_dti(
     instead of guessing a `down_payment`/`amount` and checking the result
     turn after turn.
 
-    `asset_value` never moves, same invariant as `recalculate_scenario`: it is
-    a fact about the property, not a lever. The down payment the model
-    narrates back is therefore a *consequence* of holding the asset value
-    fixed while `financed` moves to hit the target — not a lever Carlos asked
-    to pull, which is the framing the prompt's response format asks for.
+    By default `asset_value` never moves, the same invariant as
+    `recalculate_scenario`; the down payment is its complement. With
+    `keep_down_payment=True`, the down payment and term stay fixed instead,
+    and the implied asset value moves together with the financed amount.
 
     `ltv_limit=1.0` deliberately leaves LTV unconstrained here: the DTI target
     is the only thing being solved for, and the resulting LTV is reported
@@ -110,22 +118,125 @@ def solve_for_target_dti(
     credit = profile.get("credit") or {}
     income = profile.get("income") or {}
 
+    target = _normalize_ratio(dti_target)
     asset_value = float(application["asset_value"])
     term = int(term_months if term_months is not None else application["term_months"])
 
-    financed = max_financeable_fixed_asset(
-        product=application["product"],
+    common = {
+        "product": application["product"],
+        "term_months": term,
+        "net_income": income.get("net_monthly") or 1.0,
+        "existing_debt": credit.get("existing_monthly_debt", 0.0),
+        "score": credit.get("internal_score", 650),
+        "dti_limit": target,
+        "ltv_limit": 1.0,
+    }
+    if keep_down_payment:
+        financed = max_financeable(
+            down_payment=float(application["down_payment"]),
+            amount_limit=POLICIES[application["product"]].amount_manual_approval_limit.value,
+            **common,
+        )
+        asset_value = financed + float(application["down_payment"])
+    else:
+        financed = max_financeable_fixed_asset(
+            asset_value=asset_value, amount_limit=asset_value, **common
+        )
+
+    scenario = _simulate(
+        case,
+        application,
+        profile,
+        financed=financed,
+        term=term,
+        rate=None,
         asset_value=asset_value,
-        term_months=term,
+        tool_name="solve_for_target_dti",
+    )
+    scenario.update(
+        {
+            "feasible": scenario["calc"]["dti"] <= target + 1e-9,
+            "target_dti": target,
+            "constraint": "keep_down_payment" if keep_down_payment else "keep_asset_value",
+        }
+    )
+    return scenario
+
+
+@tool(
+    description=(
+        "Resolve o prazo necessário para atingir um comprometimento de renda (DTI) alvo, "
+        "sem alterar entrada, valor financiado ou valor do bem. Aceita 30 ou 0,30 para "
+        "representar 30%. Se o alvo não puder ser atingido antes do prazo máximo permitido "
+        "pela idade, devolve o melhor cenário possível com `feasible=false`; nunca invente "
+        "um prazo. Use quando Carlos disser para mexer somente no prazo."
+    )
+)
+def solve_term_for_target_dti(
+    runtime: ToolRuntime[NegotiationCase],
+    dti_target: float,
+) -> dict:
+    case = runtime.context
+    application = case.application
+    profile = case.profile
+    credit = profile.get("credit") or {}
+    income = profile.get("income") or {}
+    policy = POLICIES[application["product"]]
+    target = _normalize_ratio(dti_target)
+    current_age = age_at_maturity(profile.get("birth_date"), 0, date.today())
+    age_max_term = (
+        max_term_by_age(policy.age_at_maturity_limit.value, current_age)
+        if current_age is not None
+        else 600
+    )
+
+    bounds = term_bounds(
+        product=application["product"],
+        asset_value=float(application["asset_value"]),
+        financed=float(application["requested_amount"]),
         net_income=income.get("net_monthly") or 1.0,
         existing_debt=credit.get("existing_monthly_debt", 0.0),
         score=credit.get("internal_score", 650),
-        dti_limit=float(dti_target),
+        dti_limit=target,
         ltv_limit=1.0,
-        amount_limit=asset_value,
+        amount_limit=float(application["asset_value"]),
+        age_limit=policy.age_at_maturity_limit.value,
+        current_age_years=current_age,
+        max_search_term=max(1, age_max_term),
     )
+    if bounds["feasible"]:
+        term = bounds["min_term"]
+    else:
+        term = bounds.get("max_term") or age_max_term
+        term = max(1, term)
 
-    return _simulate(case, application, profile, financed=financed, term=term, rate=None, tool_name="solve_for_target_dti")
+    scenario = _simulate(
+        case,
+        application,
+        profile,
+        financed=float(application["requested_amount"]),
+        term=term,
+        rate=None,
+        tool_name="solve_term_for_target_dti",
+    )
+    scenario.update(
+        {
+            "feasible": bool(bounds["feasible"]),
+            "target_dti": target,
+            "constraint": "keep_amount_and_down_payment",
+            "infeasible_reason": bounds["reason"],
+        }
+    )
+    return scenario
+
+
+def _normalize_ratio(value: float) -> float:
+    ratio = float(value)
+    if 1 < ratio <= 100:
+        ratio /= 100
+    if ratio <= 0 or ratio > 1:
+        raise ValueError("dti_target deve estar entre 0 e 1, ou entre 1 e 100 como percentual")
+    return ratio
 
 
 def _simulate(
@@ -136,6 +247,7 @@ def _simulate(
     financed: float,
     term: int,
     rate: float | None,
+    asset_value: float | None = None,
     tool_name: str,
 ) -> dict:
     """Shared by both scenario tools: evaluate one credit structure, shape it
@@ -144,7 +256,7 @@ def _simulate(
     """
     credit = profile.get("credit") or {}
     income = profile.get("income") or {}
-    asset_value = float(application["asset_value"])
+    asset_value = float(asset_value if asset_value is not None else application["asset_value"])
     entrada = asset_value - financed
 
     calc = compute_scenario(
@@ -162,10 +274,21 @@ def _simulate(
     # application. So the eligibility the agent reports is the eligibility the
     # bank's rules produce — with the `POL-xxx` ids `tests/test_policy_
     # consistency.py` pins to the corpus on screen.
-    decision = evaluate({**application, "requested_amount": financed, "term_months": term}, calc, profile)
+    decision = evaluate(
+        {
+            **application,
+            "asset_value": asset_value,
+            "down_payment": entrada,
+            "requested_amount": financed,
+            "term_months": term,
+        },
+        calc,
+        profile,
+    )
 
     scenario = {
         "inputs": {
+            "asset_value": asset_value,
             "amount": financed,
             "down_payment": entrada,
             "term_months": term,

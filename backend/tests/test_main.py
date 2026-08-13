@@ -31,13 +31,16 @@ client = TestClient(app)
 # all — see `test_routing.py`).
 
 
-def test_hydrate_application_lets_the_checkpoint_win_over_the_stored_row():
+def test_hydrate_application_keeps_checkpoint_inputs_but_database_status_wins():
     row = {
         "_id": "APP-X", "customer_id": "CUST-X", "product": "mortgage",
         "asset_value": 400_000.0, "down_payment": 100_000.0, "requested_amount": 300_000.0,
         "term_months": 360, "purpose": "compra", "status": "manual_review",
     }
-    existing = {"down_payment": 150_000.0}  # a patch from a prior intake turn
+    existing = {
+        "down_payment": 150_000.0,
+        "status": "approved_with_conditions",
+    }  # a patch plus a stale decision from a prior checkpoint
 
     result = _hydrate_application(row, existing)
 
@@ -69,13 +72,54 @@ def test_hydrate_decision_context_prefers_the_final_decision_over_the_original_a
     assert decision == {"outcome": "approved_with_conditions"}
 
 
-def test_hydrate_decision_context_never_overwrites_a_live_checkpoint():
-    row = {"latest_assessment": {"calc": {"ltv": 0.99}, "decision": {"outcome": "denied"}}}
+def test_hydrate_decision_context_never_overwrites_a_matching_live_checkpoint():
+    row = {
+        "status": "manual_review",
+        "latest_assessment": {"calc": {"ltv": 0.99}, "decision": {"outcome": "denied"}},
+    }
 
     calc, decision = _hydrate_decision_context(row, {"ltv": 0.5}, {"outcome": "manual_review"})
 
     assert calc == {"ltv": 0.5}
     assert decision == {"outcome": "manual_review"}
+
+
+def test_hydrate_decision_context_replaces_a_stale_human_decision_after_resimulation():
+    row = {
+        "status": "manual_review",
+        "latest_assessment": {"calc": {"ltv": 0.75}, "decision": {"outcome": "manual_review"}},
+        "final_decision": {"outcome": "approved_with_conditions"},
+    }
+
+    calc, decision = _hydrate_decision_context(
+        row,
+        {"ltv": 0.58},
+        {"outcome": "approved_with_conditions"},
+    )
+
+    assert calc == {"ltv": 0.75}
+    assert decision == {"outcome": "manual_review"}
+
+
+def test_hydrate_decision_context_uses_the_final_scenario_calc_after_approval():
+    final = {
+        "outcome": "approved",
+        "scenario": {"calc": {"ltv": 0.69, "dti": 0.30}},
+    }
+    row = {
+        "status": "approved",
+        "latest_assessment": {"calc": {"ltv": 0.78, "dti": 0.40}},
+        "final_decision": final,
+    }
+
+    calc, decision = _hydrate_decision_context(
+        row,
+        {"ltv": 0.78, "dti": 0.40},
+        final,
+    )
+
+    assert calc == {"ltv": 0.69, "dti": 0.30}
+    assert decision == final
 
 
 @pytest.fixture

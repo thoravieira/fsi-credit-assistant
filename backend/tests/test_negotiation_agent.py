@@ -19,7 +19,12 @@ from app.agent.subagents import POLICY_RESEARCHER, PRECEDENT_ANALYST
 from app.graph.prompts import load_prompt
 from app.graph.tools.case import NegotiationCase
 from app.graph.tools.research import search_policy, search_precedents
-from app.graph.tools.scenario import check_open_finance_assets, recalculate_scenario, solve_for_target_dti
+from app.graph.tools.scenario import (
+    check_open_finance_assets,
+    recalculate_scenario,
+    solve_for_target_dti,
+    solve_term_for_target_dti,
+)
 from tests.fakes import ScriptedChatModel, tool_call
 
 APPLICATION = {
@@ -70,7 +75,12 @@ def _agent(script: list[AIMessage]):
     """The real deep agent, with the real tools, on a scripted model."""
     return create_deep_agent(
         model=ScriptedChatModel(script),
-        tools=[recalculate_scenario, solve_for_target_dti, check_open_finance_assets],
+        tools=[
+            recalculate_scenario,
+            solve_for_target_dti,
+            solve_term_for_target_dti,
+            check_open_finance_assets,
+        ],
         system_prompt=load_prompt("negotiation"),
         subagents=[POLICY_RESEARCHER, PRECEDENT_ANALYST],
         context_schema=NegotiationCase,
@@ -97,9 +107,9 @@ def _run(state: dict, script: list[AIMessage]) -> tuple[dict, list[dict], list]:
 # --- composition -----------------------------------------------------------
 
 
-def test_the_main_agent_holds_exactly_the_three_domain_tools():
+def test_the_main_agent_holds_exactly_the_four_domain_tools():
     """SDD 06 acceptance. The filesystem and `task` tools `deepagents` adds are
-    the harness; these three are the domain, and research is delegated.
+    the harness; these four are the domain, and research is delegated.
     """
     with patch.object(negotiation_module, "create_deep_agent") as factory:
         negotiation_module.get_negotiation_agent.cache_clear()
@@ -109,6 +119,7 @@ def test_the_main_agent_holds_exactly_the_three_domain_tools():
     assert [tool.name for tool in kwargs["tools"]] == [
         "recalculate_scenario",
         "solve_for_target_dti",
+        "solve_term_for_target_dti",
         "check_open_finance_assets",
     ]
     assert kwargs["subagents"] == [POLICY_RESEARCHER, PRECEDENT_ANALYST]
@@ -128,7 +139,8 @@ def test_each_subagent_has_one_retrieval_tool():
     "tool, expected",
     [
         (recalculate_scenario, {"down_payment", "term_months", "amount", "annual_rate"}),
-        (solve_for_target_dti, {"dti_target", "term_months"}),
+        (solve_for_target_dti, {"dti_target", "term_months", "keep_down_payment"}),
+        (solve_term_for_target_dti, {"dti_target"}),
         (check_open_finance_assets, set()),
         (search_policy, {"query"}),
         (search_precedents, {"query"}),
@@ -192,6 +204,44 @@ def test_solve_for_target_dti_hits_the_target_exactly():
     assert scenario["inputs"]["amount"] + scenario["inputs"]["down_payment"] == pytest.approx(
         APPLICATION["asset_value"]
     )
+
+
+def test_solve_for_target_dti_normalizes_30_as_thirty_percent_and_keeps_entry():
+    script = [
+        tool_call("solve_for_target_dti", "c1", dti_target=30, keep_down_payment=True),
+        AIMessage("Mantendo a entrada, o financiamento foi recalculado para 30%."),
+    ]
+    update, _events, _logged = _run(
+        _state("mantenha a entrada e o prazo e reduza o financiamento para DTI de 30%"),
+        script,
+    )
+
+    scenario = update["scenarios"][0]
+    assert scenario["target_dti"] == pytest.approx(0.30)
+    assert scenario["calc"]["dti"] == pytest.approx(0.30, abs=1e-3)
+    assert scenario["inputs"]["down_payment"] == pytest.approx(APPLICATION["down_payment"])
+    assert scenario["inputs"]["asset_value"] == pytest.approx(
+        scenario["inputs"]["amount"] + APPLICATION["down_payment"]
+    )
+    assert scenario["constraint"] == "keep_down_payment"
+
+
+def test_solve_term_for_target_dti_reports_when_age_ceiling_makes_it_impossible():
+    script = [
+        tool_call("solve_term_for_target_dti", "c1", dti_target=30),
+        AIMessage("Só o prazo não é suficiente para chegar a 30%."),
+    ]
+    update, _events, _logged = _run(
+        _state("sem mexer na entrada nem no valor, ajuste só o prazo para DTI de 30%"),
+        script,
+    )
+
+    scenario = update["scenarios"][0]
+    assert scenario["target_dti"] == pytest.approx(0.30)
+    assert scenario["feasible"] is False
+    assert scenario["calc"]["dti"] > 0.30
+    assert scenario["inputs"]["amount"] == pytest.approx(APPLICATION["requested_amount"])
+    assert scenario["inputs"]["down_payment"] == pytest.approx(APPLICATION["down_payment"])
 
 
 def test_deep_agent_state_does_not_leak_into_agent_state():

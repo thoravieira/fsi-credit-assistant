@@ -54,6 +54,8 @@ def persist_decision(state: AgentState) -> dict:
     scenario = decision.get("scenario") or {}
     calc = scenario.get("calc") or state.get("calc") or {}
     outcome = decision.get("outcome", "denied")
+    final_application = _application_for_scenario(application, scenario)
+    final_application["status"] = outcome
     now = datetime.now(timezone.utc)
 
     append_event(
@@ -71,13 +73,51 @@ def persist_decision(state: AgentState) -> dict:
 
     get_db()["applications"].update_one(
         {"_id": application_id},
-        {"$set": {"status": outcome, "updated_at": now, "final_decision": decision}},
+        {
+            "$set": {
+                "product": final_application.get("product"),
+                "asset_value": final_application.get("asset_value"),
+                "down_payment": final_application.get("down_payment"),
+                "requested_amount": final_application.get("requested_amount"),
+                "term_months": final_application.get("term_months"),
+                "purpose": final_application.get("purpose", ""),
+                "status": outcome,
+                "updated_at": now,
+                "final_decision": decision,
+            }
+        },
     )
 
-    _write_precedent(application, profile, calc, decision, now)
-    _write_memories(application, profile, calc, decision, now)
+    _write_precedent(final_application, profile, calc, decision, now)
+    _write_memories(final_application, profile, calc, decision, now)
 
-    return {"stage": "closed"}
+    return {"stage": "closed", "application": final_application}
+
+
+def _application_for_scenario(application: dict, scenario: dict) -> dict:
+    """Project the approved scenario back onto the live application row.
+
+    A negotiated structure is not merely an attachment to the verdict: it is
+    the structure the bank approved. Persisting the original request next to a
+    final decision calculated from different inputs creates an internally
+    contradictory queue row and a bad precedent.
+    """
+    inputs = scenario.get("inputs") or {}
+    amount = inputs.get("amount")
+    down_payment = inputs.get("down_payment")
+    asset_value = inputs.get("asset_value")
+    if asset_value is None and amount is not None and down_payment is not None:
+        asset_value = amount + down_payment
+
+    return {
+        **application,
+        "asset_value": asset_value if asset_value is not None else application.get("asset_value"),
+        "down_payment": (
+            down_payment if down_payment is not None else application.get("down_payment")
+        ),
+        "requested_amount": amount if amount is not None else application.get("requested_amount"),
+        "term_months": inputs.get("term_months", application.get("term_months")),
+    }
 
 
 def _write_precedent(

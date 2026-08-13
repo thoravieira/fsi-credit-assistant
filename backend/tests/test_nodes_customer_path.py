@@ -198,6 +198,59 @@ def test_credit_calculator_solves_financed_for_the_true_max_term():
     assert solved["asset_value"] == pytest.approx(expected_financed + 16_000.0)
 
 
+def test_intake_flags_the_manual_approval_band_explicitly():
+    prior = {
+        "customer_id": "CUST-0001",
+        "product": "mortgage",
+        "down_payment": 100_000.0,
+        "term_months": 360,
+        "purpose": "Compra de imóvel",
+    }
+    state = _base_state(
+        application=prior,
+        messages=[HumanMessage("e sem aprovação automática, qual o valor máximo?")],
+    )
+    fake_llm = _FakeStructuredLLM(_ExtractedFields(intent="solve_financed_manual"))
+
+    result = intake(state, llm=fake_llm)
+
+    assert result["application"]["_intent"] == "solve_financed_manual"
+
+
+def test_credit_calculator_solves_against_manual_not_automatic_limits():
+    application = {
+        "product": "mortgage",
+        "down_payment": 100_000.0,
+        "term_months": 360,
+        "purpose": "Compra de imóvel",
+        "_intent": "solve_financed_manual",
+    }
+    profile = {
+        "birth_date": "1990-04-17",
+        "credit": {"internal_score": 782, "existing_monthly_debt": 1_350.0},
+        "income": {"net_monthly": 11_200.0, "verified": True},
+    }
+
+    result = credit_calculator(_base_state(application=application, profile=profile))
+    solved = result["application"]
+    policy = POLICIES["mortgage"]
+    expected = max_financeable(
+        product="mortgage",
+        down_payment=100_000.0,
+        term_months=360,
+        net_income=11_200.0,
+        existing_debt=1_350.0,
+        score=782,
+        dti_limit=policy.dti_absolute_limit.value,
+        ltv_limit=policy.ltv_absolute_limit.value,
+        amount_limit=policy.amount_manual_approval_limit.value,
+    )
+
+    assert solved["requested_amount"] == pytest.approx(expected)
+    assert solved["requested_amount"] > policy.amount_auto_approval_limit.value
+    assert result["calculation_context"]["approval_band"] == "manual"
+
+
 def test_load_context_reads_seeded_profile():
     state = _base_state(application={"customer_id": "CUST-0001"})
 
@@ -384,6 +437,11 @@ def test_decision_updates_the_application_row(application_row):
     assert doc["status"] == "manual_review"
     assert doc["latest_assessment"]["decision"] == result["decision"]
     assert doc["latest_assessment"]["calc"]["ltv"] == pytest.approx(0.75)
+    assert doc["product"] == "mortgage"
+    assert doc["asset_value"] == pytest.approx(400_000.0)
+    assert doc["down_payment"] == pytest.approx(100_000.0)
+    assert doc["requested_amount"] == pytest.approx(300_000.0)
+    assert doc["term_months"] == 360
 
 
 def test_decision_seq_increments_across_resimulations(application_row):

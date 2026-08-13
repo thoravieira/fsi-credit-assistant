@@ -68,6 +68,7 @@ class ProductPolicy:
     dti_auto_approval_limit: Threshold
     score_auto_approval_floor: Threshold
     amount_auto_approval_limit: Threshold
+    amount_manual_approval_limit: Threshold
     income_verification: Threshold
 
     @property
@@ -108,6 +109,9 @@ POLICIES: dict[Product, ProductPolicy] = {
         amount_auto_approval_limit=Threshold(
             "amount_auto_approval_limit", 300_000, "POL-020", "amount"
         ),
+        amount_manual_approval_limit=Threshold(
+            "amount_manual_approval_limit", 800_000, "POL-020", "amount"
+        ),
         income_verification=Threshold("income_verification", None, "POL-012", "flag"),
     ),
     "auto": ProductPolicy(
@@ -122,6 +126,9 @@ POLICIES: dict[Product, ProductPolicy] = {
         ),
         amount_auto_approval_limit=Threshold(
             "amount_auto_approval_limit", 80_000, "POL-021", "amount"
+        ),
+        amount_manual_approval_limit=Threshold(
+            "amount_manual_approval_limit", 200_000, "POL-021", "amount"
         ),
         income_verification=Threshold("income_verification", None, "POL-013", "flag"),
     ),

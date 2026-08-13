@@ -21,8 +21,8 @@ VECTOR_INDEX_NAME = "vector_index"
 
 def ensure_standard_indexes(db) -> None:
     print("## Standard indexes")
-    db["applications"].create_index([("status", ASCENDING), ("created_at", DESCENDING)])
-    print("  applications: {status: 1, created_at: -1}")
+    db["applications"].create_index([("status", ASCENDING), ("updated_at", DESCENDING)])
+    print("  applications: {status: 1, updated_at: -1}")
     db["decisions_log"].create_index([("application_id", ASCENDING), ("seq", ASCENDING)])
     print("  decisions_log: {application_id: 1, seq: 1}")
     print()

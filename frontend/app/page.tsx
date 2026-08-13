@@ -19,16 +19,15 @@ import type { Product } from '../lib/api';
 // R$ 11.200, dívida existente R$ 1.350, score interno 782 (SDD 16 §2).
 const CUSTOMER_ID = 'CUST-0001';
 
-// Item 4 — "has the customer already seen the current decision" persisted
-// per thread, so the bell rings again only for a *new* analyst decision, not
-// on every reopen of an already-seen one. `status + updated_at` is a cheap
-// version marker: both change whenever `decision`/`persist_decision` write a
-// new outcome, and neither is exposed as a dedicated id today.
+// The bell is only for a new human decision. The v2 key intentionally leaves
+// markers written by the previous implementation behind: that version also
+// marked automatic assessments, which made an old simulation ring on load.
 function decisionSeenKey(threadId: string) {
-  return `credit-assistant:decision-seen:${threadId}`;
+  return `credit-assistant:decision-seen:v2:${threadId}`;
 }
-function decisionMarker(app: { status?: string; updated_at?: string }) {
-  return `${app.status ?? ''}@${app.updated_at ?? ''}`;
+function analystDecisionMarker(app: Awaited<ReturnType<typeof getApplication>>) {
+  if (!app.final_decision || app.final_decision.outcome !== app.status) return null;
+  return `${app.final_decision.outcome}@${app.updated_at ?? ''}`;
 }
 
 // Per-product defaults so switching the picker lands on sane numbers instead
@@ -117,23 +116,33 @@ export default function CustomerPage() {
 
   const { trace, messages, decision, isStreaming, send, hydrate, markContracted } = useAgentStream(threadId ?? '', 'customer');
 
-  // Item 4 — check once per thread load whether the analyst's current
-  // decision is one this browser hasn't marked "seen" yet. Deliberately a
-  // lightweight `getApplication` here, not a full `openHistory()`: this must
-  // not itself open the chat or flip `formOpen`, it only decides whether the
-  // bell should ring.
+  // Establish the current state as a silent baseline, then poll for an analyst
+  // decision made while this customer session is open. The baseline is also
+  // persisted so leaving for the analyst console and returning detects the
+  // newly recorded result without animating for historical decisions.
   useEffect(() => {
     if (!threadId) return;
     let cancelled = false;
-    getApplication(threadId).then((app) => {
+    const key = decisionSeenKey(threadId);
+
+    async function checkDecision() {
+      const app = await getApplication(threadId!);
       if (cancelled) return;
-      const current = currentDecisionOf(app);
-      if (current && decisionMarker(app) !== localStorage.getItem(decisionSeenKey(threadId))) {
-        setHasUnreadDecision(true);
+      const marker = analystDecisionMarker(app) ?? 'none';
+      const seen = localStorage.getItem(key);
+      if (seen === null) {
+        localStorage.setItem(key, marker);
+        setHasUnreadDecision(false);
+      } else {
+        setHasUnreadDecision(marker !== 'none' && marker !== seen);
       }
-    });
+    }
+
+    checkDecision().catch(() => undefined);
+    const timer = window.setInterval(() => checkDecision().catch(() => undefined), 5000);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
     };
   }, [threadId]);
   const { replay, start: startReplay } = useReplay();
@@ -195,7 +204,7 @@ export default function CustomerPage() {
     setHasUnreadDecision(false);
     const result = await openHistory();
     if (!result) return;
-    localStorage.setItem(decisionSeenKey(threadId), decisionMarker(result.app));
+    localStorage.setItem(decisionSeenKey(threadId), analystDecisionMarker(result.app) ?? 'none');
     if (result.decisionMessageId) {
       setHighlightMessageId(result.decisionMessageId);
       setTimeout(() => setHighlightMessageId(null), 2500);
@@ -223,9 +232,10 @@ export default function CustomerPage() {
         // so the phone would look pinned in place instead of tracking the
         // window). The 390px phone comfortably fits 44% of any realistic
         // demo window width, so there's nothing to trade off by removing it.
-        <div className="flex flex-1 items-start justify-center overflow-y-auto overflow-x-hidden p-5">
-          <IOSDevice dark width={390} height={800}>
-            <CustomerApp
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
+          <div className="flex min-h-full items-center justify-center p-5">
+            <IOSDevice dark width={390} height={800}>
+              <CustomerApp
               product={product}
               setProduct={switchProduct}
               termOptions={PRODUCT_DEFAULTS[product].terms}
@@ -254,8 +264,9 @@ export default function CustomerPage() {
               hasUnreadDecision={hasUnreadDecision}
               onBellClick={handleBellClick}
               highlightMessageId={highlightMessageId}
-            />
-          </IOSDevice>
+              />
+            </IOSDevice>
+          </div>
         </div>
       }
       right={

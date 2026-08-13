@@ -106,7 +106,9 @@ def list_applications(status: str | None = None, customer_id: str | None = None)
         query["status"] = status
     if customer_id:
         query["customer_id"] = customer_id
-    docs = list(get_db()["applications"].find(query).sort("created_at", -1))
+    docs = list(
+        get_db()["applications"].find(query).sort([("updated_at", -1), ("created_at", -1)])
+    )
     return {"applications": docs}
 
 
@@ -263,10 +265,11 @@ def _hydrate_application(row: dict | None, existing: dict | None) -> dict | None
     while `load_context` needs a `customer_id`. This is where HTTP identity
     becomes graph state.
 
-    Anything already in the checkpoint wins over the stored row, because
+    Negotiable inputs already in the checkpoint win over the stored row, because
     `application` is an overwrite field: re-hydrating it wholesale on every
     turn would discard the patches `intake` made on previous turns and silently
-    undo a re-simulation.
+    undo a re-simulation. Status is the exception: both decision writers commit
+    it to MongoDB, so the stored value is authoritative across later turns.
     """
     if row is None:
         return existing
@@ -287,7 +290,12 @@ def _hydrate_application(row: dict | None, existing: dict | None) -> dict | None
         # already approved/denied by a human, not still pending.
         "status": row.get("status"),
     }
-    return {**stored, **(existing or {})}
+    hydrated = {**stored, **(existing or {})}
+    # The database status is committed by both automatic and human decision
+    # paths. A checkpoint can still contain the outcome from before a later
+    # re-simulation, so it must never override that authoritative value.
+    hydrated["status"] = row.get("status")
+    return hydrated
 
 
 def _hydrate_decision_context(
@@ -301,16 +309,37 @@ def _hydrate_decision_context(
     application seeded straight into `applications` (Part B of the demo
     data) skips that entirely — its checkpoint has neither — so
     `analyst_brief`'s dossier and `negotiation`'s case briefing would open on
-    a blank assessment. Same "checkpoint wins" rule as `_hydrate_application`:
-    only fall back to the stored row when the checkpoint truly has nothing,
-    never overwrite a live negotiation's own recalculated state.
+    a blank assessment. A checkpoint still wins only when its decision outcome
+    matches the row's authoritative status; otherwise the matching stored
+    producer replaces the stale state left by a re-simulation.
     """
-    if row is None or existing_calc is not None or existing_decision is not None:
+    if row is None:
         return existing_calc, existing_decision
+
     latest_assessment = row.get("latest_assessment") or {}
-    calc = latest_assessment.get("calc")
-    decision = row.get("final_decision") or latest_assessment.get("decision")
-    return calc, decision
+    latest_calc = latest_assessment.get("calc")
+    latest_decision = latest_assessment.get("decision")
+    final_decision = row.get("final_decision")
+    status = row.get("status")
+
+    # A matching checkpoint is live and can carry a just-recalculated scenario.
+    if existing_decision and existing_decision.get("outcome") == status:
+        if final_decision and final_decision.get("outcome") == status:
+            scenario_calc = (final_decision.get("scenario") or {}).get("calc")
+            return scenario_calc or existing_calc or latest_calc, existing_decision
+        return existing_calc or latest_calc, existing_decision
+
+    # Otherwise select the stored producer whose outcome matches the database
+    # status. This is the re-simulation case: the old human decision remains in
+    # a checkpoint, while latest_assessment is the new manual-review result.
+    if final_decision and final_decision.get("outcome") == status:
+        scenario_calc = (final_decision.get("scenario") or {}).get("calc")
+        return scenario_calc or latest_calc or existing_calc, final_decision
+    if latest_decision and latest_decision.get("outcome") == status:
+        return latest_calc or existing_calc, latest_decision
+
+    # Draft/legacy rows may not have a status-matching producer yet.
+    return existing_calc or latest_calc, existing_decision or final_decision or latest_decision
 
 
 async def stream_chat_events(
