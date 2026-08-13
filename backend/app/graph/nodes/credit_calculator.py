@@ -17,6 +17,7 @@ from app.domain.calculator import (
 )
 from app.domain.rules import POLICIES, age_at_maturity
 from app.graph.state import AgentState, CalcResult
+from app.runtime_trace import trace_started
 
 
 def _limits(policy, *, manual: bool) -> tuple[float, float, float]:
@@ -161,6 +162,7 @@ _SOLVERS = {
 
 
 def credit_calculator(state: AgentState) -> dict:
+    trace_started("credit_calculator")
     application = dict(state["application"])
     profile = state.get("profile") or {}
     credit = profile.get("credit") or {}

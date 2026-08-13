@@ -14,7 +14,7 @@ import { ScenarioTable } from '../../components/ScenarioTable';
 import { CaseQueue, toPendingCase } from '../../components/CaseQueue';
 import {
   CUSTOMER_NAMES, CreditApplication, OUTCOME_LABELS, PRODUCT_LABELS,
-  approve, currentDecisionOf, fmtBRL, getApplication, listApplications,
+  currentDecisionOf, fmtBRL, getApplication, listApplications,
 } from '../../lib/api';
 
 // Instruction text sent to the deep agent, not fabricated numbers — the
@@ -54,6 +54,7 @@ export default function ConsolePage() {
   const [applications, setApplications] = useState<CreditApplication[]>([]);
   const [selectedApp, setSelectedApp] = useState<CreditApplication | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [confirmationNotice, setConfirmationNotice] = useState<string | null>(null);
   const [drawer, setDrawer] = useState<DrawerState>(null);
   const [focus, setFocus] = useState<FocusState | null>(null);
   const openedRef = useRef<Set<string>>(new Set());
@@ -77,9 +78,12 @@ export default function ConsolePage() {
   useEffect(() => {
     setFocus(null);
     setDrawer(null);
+    setConfirmationNotice(null);
   }, [selectedId]);
 
-  const { trace, messages, decision, pendingApproval, scenarios, send, isStreaming } = useAgentStream(selectedId ?? '', 'analyst');
+  const {
+    trace, messages, decision, pendingApproval, scenarios, send, confirmApproval, isStreaming,
+  } = useAgentStream(selectedId ?? '', 'analyst');
   const { replay, start: startReplay } = useReplay();
 
   const sendAndReset = (message: string) => {
@@ -122,13 +126,17 @@ export default function ConsolePage() {
     sendAndReset(outcome === 'approved' ? 'Aprovar a proposta apresentada.' : 'Reprovar a proposta, não seguir com o crédito.');
   };
 
-  const confirmApproval = async () => {
+  const confirmHumanDecision = async () => {
     if (!selectedId || !pendingApproval) return;
     setConfirming(true);
     try {
-      await approve(selectedId, { outcome: pendingApproval.outcome });
-      openedRef.current.delete(selectedId);
-      setSelectedId(null);
+      const recorded = await confirmApproval({ outcome: pendingApproval.outcome });
+      const updated = await getApplication(selectedId);
+      setSelectedApp(updated);
+      setConfirmationNotice(
+        `Decisão registrada: ${OUTCOME_LABELS[recorded?.outcome ?? updated.status ?? ''] ?? recorded?.outcome ?? updated.status}. ` +
+        'O trace mostra a gravação no log, a atualização da proposta, o novo precedente e a memória aprendida.'
+      );
       refreshQueue();
     } finally {
       setConfirming(false);
@@ -175,6 +183,11 @@ export default function ConsolePage() {
               </div>
 
               {shownDecision && <DecisionCard decision={shownDecision} />}
+              {confirmationNotice && (
+                <div className="border border-forest bg-[#E8F7EF] px-3.5 py-3 text-[11.5px] font-semibold leading-relaxed text-forest">
+                  {confirmationNotice}
+                </div>
+              )}
               <ScenarioTable scenarios={scenarios} />
               {messages.length > 0 && (
                 <ChatThread
@@ -193,7 +206,7 @@ export default function ConsolePage() {
                       Proposta do agente: <span className="text-forest">{OUTCOME_LABELS[pendingApproval.outcome] ?? pendingApproval.outcome}</span> — aguardando confirmação humana.
                     </div>
                     <Markdown text={pendingApproval.rationale} className="max-h-24 overflow-auto text-[12px] leading-relaxed text-charcoal/70" />
-                    <button onClick={confirmApproval} disabled={confirming} className="border-none bg-spring py-3 text-[13px] font-extrabold text-ink disabled:opacity-50">
+                    <button onClick={confirmHumanDecision} disabled={confirming} className="border-none bg-spring py-3 text-[13px] font-extrabold text-ink disabled:opacity-50">
                       {confirming ? 'Confirmando…' : 'Confirmar ' + (OUTCOME_LABELS[pendingApproval.outcome] ?? pendingApproval.outcome)}
                     </button>
                   </>

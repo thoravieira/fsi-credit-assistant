@@ -11,9 +11,11 @@ from app.audit import append_event
 from app.db import get_db
 from app.domain.rules import evaluate
 from app.graph.state import AgentState
+from app.runtime_trace import trace_started
 
 
 def decision(state: AgentState) -> dict:
+    trace_started("decision")
     application = state["application"]
     calc = state["calc"]
     profile = state.get("profile") or {}

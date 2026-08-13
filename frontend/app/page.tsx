@@ -115,7 +115,9 @@ export default function CustomerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once on mount; a reused thread keeps its own history, these are only the fallback for creating a brand new one
   }, []);
 
-  const { trace, messages, decision, isStreaming, send, hydrate, markContracted } = useAgentStream(threadId ?? '', 'customer');
+  const {
+    trace, messages, decision, isStreaming, send, appendTrace, hydrate, markContracted,
+  } = useAgentStream(threadId ?? '', 'customer');
 
   // Establish the current state as a silent baseline, then poll for an analyst
   // decision made while this customer session is open. The baseline is also
@@ -226,7 +228,9 @@ export default function CustomerPage() {
     if (!threadId) return;
     markContracted(m.id);
     try {
-      await contractApplication(threadId);
+      const result = await contractApplication(threadId);
+      appendTrace(result.trace);
+      startReplay('Contratação', result.trace, 0.5);
       await openHistory();
     } catch {
       markContracted(m.id, false);

@@ -32,6 +32,7 @@ from app.memory.store import (
     customer_preferences_namespace,
     get_store,
 )
+from app.runtime_trace import trace_started, trace_step
 
 PRODUCT_LABELS = {"mortgage": "financiamento imobiliário", "auto": "financiamento de veículo"}
 OUTCOME_LABELS = {
@@ -49,6 +50,7 @@ def _ltv_band(ltv: float) -> str:
 
 
 def persist_decision(state: AgentState) -> dict:
+    trace_started("persist_decision")
     decision = state.get("decision") or {}
     application = state.get("application") or {}
     profile = state.get("profile") or {}
@@ -72,6 +74,7 @@ def persist_decision(state: AgentState) -> dict:
         conditions=decision.get("conditions", []),
         rationale=decision.get("rationale", ""),
     )
+    trace_step("persist_decision", "audit_log", collection="decisions_log", event_type="final_decision")
 
     get_db()["applications"].update_one(
         {"_id": application_id},
@@ -89,9 +92,12 @@ def persist_decision(state: AgentState) -> dict:
             }
         },
     )
+    trace_step("persist_decision", "application_update", collection="applications", outcome=outcome)
 
     _write_precedent(final_application, profile, calc, decision, now)
+    trace_step("persist_decision", "precedent_upsert", collection="historical_cases")
     _write_memories(final_application, profile, calc, decision, now)
+    trace_step("persist_decision", "memory_write", collection="agent_memories", namespaces=3)
 
     notification = (
         "Sua proposta foi aprovada. Confira abaixo as condições finais e, se estiver de acordo, "

@@ -11,9 +11,11 @@ from langgraph.config import get_stream_writer
 from app.domain.calculator import annual_rate, dti as calc_dti, effective_monthly_rate, ltv as calc_ltv, pmt
 from app.graph.state import AgentState
 from app.retrieval.policies import search_policies
+from app.runtime_trace import trace_started
 
 
 def policy_retrieval(state: AgentState) -> dict:
+    trace_started("policy_retrieval")
     application = state["application"]
     profile = state.get("profile") or {}
 

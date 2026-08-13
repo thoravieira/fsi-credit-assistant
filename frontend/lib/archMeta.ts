@@ -31,11 +31,11 @@ export const CHIP: Record<ChipKey, { label: string; bg: string; color: string }>
   human: { label: 'Humano', bg: 'rgba(32,30,29,.07)', color: '#4a5350' },
 };
 
-// Item 9 — every card links back to the exact real source, not just a
-// paraphrase: `main` branch (not a pinned SHA), so the link always opens
-// whatever is actually deployed rather than drifting from a stale commit.
+// The container receives the deployed commit SHA at build time. The branch
+// fallback keeps local `npm run dev` useful, while the demo image links to an
+// immutable revision that cannot drift from what the audience is seeing.
 export const GITHUB_REPO = 'thoravieira/fsi-credit-assistant';
-export const GITHUB_REF = 'main';
+export const GITHUB_REF = process.env.NEXT_PUBLIC_GIT_REF ?? 'fix/inverse-simulation-and-journey-ux';
 export function githubUrl(file: string, lines: [number, number]): string {
   return `https://github.com/${GITHUB_REPO}/blob/${GITHUB_REF}/${file}#L${lines[0]}-L${lines[1]}`;
 }
@@ -62,6 +62,27 @@ export interface NodeInfo {
   usage: SourceRef;
 }
 
+export const TESTS: Record<string, SourceRef> = {
+  api: { file: 'backend/tests/test_sse_mapping.py', lines: [47, 162] },
+  router: { file: 'backend/tests/test_routing.py', lines: [25, 75] },
+  intake: { file: 'backend/tests/test_nodes_customer_path.py', lines: [59, 157] },
+  load_context: { file: 'backend/tests/test_nodes_customer_path.py', lines: [254, 263] },
+  policy_retrieval: { file: 'backend/tests/test_nodes_customer_path.py', lines: [265, 286] },
+  credit_calculator: { file: 'backend/tests/test_calculator.py', lines: [17, 110] },
+  decision: { file: 'backend/tests/test_rules.py', lines: [64, 345] },
+  customer_response: { file: 'backend/tests/test_nodes_customer_path.py', lines: [311, 381] },
+  precedent_search: { file: 'backend/tests/test_analyst_path.py', lines: [136, 171] },
+  analyst_brief: { file: 'backend/tests/test_analyst_brief.py', lines: [32, 51] },
+  negotiation: { file: 'backend/tests/test_negotiation_agent.py', lines: [110, 343] },
+  policy_researcher: { file: 'backend/tests/test_negotiation_agent.py', lines: [133, 158] },
+  precedent_analyst: { file: 'backend/tests/test_negotiation_agent.py', lines: [133, 158] },
+  await_approval: { file: 'backend/tests/test_analyst_path.py', lines: [173, 241] },
+  persist_decision: { file: 'backend/tests/test_analyst_path.py', lines: [173, 241] },
+  scenario_tools: { file: 'backend/tests/test_negotiation_agent.py', lines: [160, 245] },
+  research_tools: { file: 'backend/tests/test_negotiation_agent.py', lines: [110, 158] },
+  contract_acceptance: { file: 'backend/tests/test_main.py', lines: [373, 446] },
+};
+
 export const NODES: Record<string, NodeInfo> = {
   api: {
     label: 'FastAPI', sub: 'SSE · astream', chips: ['graph'],
@@ -69,8 +90,8 @@ export const NODES: Record<string, NodeInfo> = {
     rows: [['Camada', 'API'], ['stream_mode', 'updates · messages · custom'], ['state', 'emitido uma vez, antes de done']],
     sample: 'event: trace\ndata: {"node":"policy_retrieval","status":"finished","ms":812}',
     code: 'async for mode, chunk in graph.astream(\n    payload, config={"configurable":{"thread_id": thread_id}},\n    stream_mode=["updates","messages","custom"]):\n    yield sse(map_chunk(mode, chunk))',
-    source: { file: 'backend/app/main.py', lines: [288, 391] },
-    usage: { file: 'backend/app/main.py', lines: [393, 396] },
+    source: { file: 'backend/app/main.py', lines: [533, 657] },
+    usage: { file: 'backend/app/main.py', lines: [716, 725] },
   },
   router: {
     label: 'router', sub: 'decide o caminho', chips: ['python', 'graph'],
@@ -87,7 +108,7 @@ export const NODES: Record<string, NodeInfo> = {
     rows: [['Camada', 'LangChain'], ['Modelo', 'OpenAI · structured output'], ['Memória', 'checkpoint (curta)'], ['Tokens', '312 in · 88 out']],
     sample: '{"product":"mortgage","asset_value":400000,\n "down_payment":100000,"term_months":360}',
     code: 'llm = get_chat_model().with_structured_output(CreditApplication)\napp = llm.invoke([SystemMessage(PROMPT), *state["messages"]])\nreturn {"application": {**(state.get("application") or {}), **app}}',
-    source: { file: 'backend/app/graph/nodes/intake.py', lines: [55, 101] },
+    source: { file: 'backend/app/graph/nodes/intake.py', lines: [111, 157] },
     usage: { file: 'backend/app/graph/builder.py', lines: [45, 45] },
   },
   load_context: {
@@ -96,7 +117,7 @@ export const NODES: Record<string, NodeInfo> = {
     rows: [['Camada', 'LangGraph'], ['Mem. curta', 'checkpoints · TTL 24 h · MongoDBSaver'], ['Mem. longa', 'agent_memories · MongoDBStore'], ['Namespaces', '("customer",id,"preferences") · ("...","facts") · ("analyst",id,"decision_patterns")']],
     sample: '{"content":"Prioriza parcela menor sobre prazo curto",\n "observed_at":"2026-05-02T13:07:00Z"}',
     code: 'store = get_store()\nmems = store.search(("customer", cid, "preferences"), limit=5)\nprofile = db.customer_profiles.find_one({"_id": cid})',
-    source: { file: 'backend/app/graph/nodes/load_context.py', lines: [13, 39] },
+    source: { file: 'backend/app/graph/nodes/load_context.py', lines: [14, 41] },
     usage: { file: 'backend/app/graph/builder.py', lines: [46, 46] },
   },
   policy_retrieval: {
@@ -105,7 +126,7 @@ export const NODES: Record<string, NodeInfo> = {
     rows: [['Camada', 'LangChain + MongoDB'], ['Embeddings', 'voyage-4-lite · 1024d'], ['Operação', '$vectorSearch · credit_policies · k=4 · cosine'], ['Latência', 'embed 120 ms + busca 520 ms']],
     sample: '[{"_id":"POL-020","score":0.92,"title":"Alçadas de aprovação"},\n {"_id":"POL-004","score":0.88,"title":"DTI máximo"}]',
     code: 'writer({"op":"$vectorSearch","collection":"credit_policies","k":4})\ndocs = vector_store.similarity_search(query, k=4,\n        pre_filter={"product": product})   # pre_filter, não filter',
-    source: { file: 'backend/app/graph/nodes/policy_retrieval.py', lines: [16, 42] },
+    source: { file: 'backend/app/graph/nodes/policy_retrieval.py', lines: [17, 45] },
     usage: { file: 'backend/app/graph/builder.py', lines: [47, 47] },
   },
   credit_calculator: {
@@ -114,7 +135,7 @@ export const NODES: Record<string, NodeInfo> = {
     rows: [['Camada', 'domain/calculator.py'], ['Modelo', 'nenhum — 0 LLM'], ['Taxa mensal', '(1+anual)^(1/12) − 1 (efetiva)'], ['Latência', '< 10 ms']],
     sample: '{"monthly_payment":2658.78,"ltv":0.75,"dti":0.358,\n "annual_rate":0.106,"cet_annual":0.1113}',
     code: 'def pmt(pv, i, n):\n    return pv * i / (1 - (1 + i) ** -n)\n\ni = (1 + annual) ** (1/12) - 1      # efetiva, nunca annual/12',
-    source: { file: 'backend/app/graph/nodes/credit_calculator.py', lines: [14, 63] },
+    source: { file: 'backend/app/domain/calculator.py', lines: [305, 350] },
     usage: { file: 'backend/app/graph/builder.py', lines: [48, 48] },
   },
   decision: {
@@ -123,7 +144,7 @@ export const NODES: Record<string, NodeInfo> = {
     rows: [['Camada', 'domain/rules.py'], ['Saídas', 'auto_approved · manual_review · denied'], ['Escreve', 'decisions_log · applications.status']],
     sample: '{"outcome":"manual_review","policy_refs":["POL-020","POL-004"],\n "breached_rules":["ltv_auto_approval_limit","dti_auto_approval_limit"]}',
     code: 'if ltv > LIMITS[p]["ltv_abs"] or dti > LIMITS[p]["dti_abs"]:\n    return Decision(outcome="denied", policy_refs=["POL-001","POL-004"])\nif auto_ok: return Decision(outcome="auto_approved", ...)',
-    source: { file: 'backend/app/graph/nodes/decision.py', lines: [16, 49] },
+    source: { file: 'backend/app/domain/rules.py', lines: [180, 285] },
     usage: { file: 'backend/app/graph/builder.py', lines: [49, 49] },
   },
   customer_response: {
@@ -132,7 +153,7 @@ export const NODES: Record<string, NodeInfo> = {
     rows: [['Camada', 'LangChain'], ['Modelo', 'OpenAI · chat completions (stream)'], ['Tokens', '~420 in · 96 out']],
     sample: '"Com entrada de R$ 100.000, a parcela fica em R$ 2.658,78 — LTV de 75,0%…"',
     code: 'async for chunk in llm.astream(prompt.format(calc=state["calc"],\n        policies=state["policies"])):\n    writer({"token": chunk.content})',
-    source: { file: 'backend/app/graph/nodes/customer_response.py', lines: [40, 63] },
+    source: { file: 'backend/app/graph/nodes/customer_response.py', lines: [53, 90] },
     usage: { file: 'backend/app/graph/builder.py', lines: [50, 50] },
   },
   precedent_search: {
@@ -141,7 +162,7 @@ export const NODES: Record<string, NodeInfo> = {
     rows: [['Camada', 'LangChain + MongoDB'], ['Operação', '$vectorSearch · historical_cases · k=3'], ['Detalhe', 'text_key="summary" — a prosa do caso mora em summary']],
     sample: '[{"_id":"CASE-2025-0001","score":0.88,"decision":"approved_with_conditions"}]',
     code: 'store = MongoDBAtlasVectorSearch(coll, embeddings, text_key="summary")\ncases = store.similarity_search(q, k=3, pre_filter={"product": p})',
-    source: { file: 'backend/app/graph/nodes/precedent_search.py', lines: [30, 41] },
+    source: { file: 'backend/app/graph/nodes/precedent_search.py', lines: [31, 48] },
     usage: { file: 'backend/app/graph/builder.py', lines: [51, 51] },
   },
   analyst_brief: {
@@ -150,7 +171,7 @@ export const NODES: Record<string, NodeInfo> = {
     rows: [['Camada', 'LangChain'], ['Modelo', 'OpenAI · chat completions'], ['Tokens', '~980 in · 210 out']],
     sample: '{"recommendation":"negociar entrada ou prazo",\n "policy_refs":["POL-020","POL-004"],"precedents":["CASE-2025-0001"]}',
     code: 'brief = llm.invoke(BRIEF_PROMPT.format(calc=calc, policies=pol,\n        precedents=prec))\nreturn {"decision": {**brief, "stage": "negotiation"}}',
-    source: { file: 'backend/app/graph/nodes/analyst_brief.py', lines: [40, 66] },
+    source: { file: 'backend/app/graph/nodes/analyst_brief.py', lines: [44, 73] },
     usage: { file: 'backend/app/graph/builder.py', lines: [52, 52] },
   },
   negotiation: {
@@ -159,7 +180,7 @@ export const NODES: Record<string, NodeInfo> = {
     rows: [['Camada', 'Deep Agents (deepagents 0.7.5)'], ['Ferramentas', 'recalculate_scenario → Python · check_open_finance_assets'], ['Subagentes', 'policy_researcher · precedent_analyst'], ['Checkpoints', 'aninhados no mesmo thread_id do pai']],
     sample: '{"scenario":{"down_payment":140000},"outcome":"manual_review",\n "resumo":"parcela R$ 2.164,54 · LTV 65,0% · DTI 31,4%"}',
     code: 'agent = create_deep_agent(model=get_chat_model(),\n    tools=[recalculate_scenario, check_open_finance_assets],\n    subagents=[POLICY_RESEARCHER, PRECEDENT_ANALYST], store=store)\n# sem checkpointer=: herda o do pai pelo config',
-    source: { file: 'backend/app/agent/negotiation.py', lines: [78, 89] },
+    source: { file: 'backend/app/agent/negotiation.py', lines: [73, 112] },
     usage: { file: 'backend/app/graph/builder.py', lines: [53, 53] },
   },
   policy_researcher: {
@@ -169,7 +190,7 @@ export const NODES: Record<string, NodeInfo> = {
     sample: '"DTI de 31,4% permitido em análise manual com fator compensatório (POL-004, POL-016)."',
     code: 'POLICY_RESEARCHER: SubAgent = {"name":"policy_researcher",\n  "description":"Consulta a política de crédito…",\n  "system_prompt": load_prompt("subagent_policy"), "tools":[search_policy]}',
     source: { file: 'backend/app/agent/subagents.py', lines: [16, 24] },
-    usage: { file: 'backend/app/agent/negotiation.py', lines: [71, 71] },
+    usage: { file: 'backend/app/agent/negotiation.py', lines: [82, 82] },
   },
   precedent_analyst: {
     label: 'precedent_analyst', sub: 'subagente · precedentes', chips: ['deep', 'vector'],
@@ -178,7 +199,7 @@ export const NODES: Record<string, NodeInfo> = {
     sample: '"Dois precedentes aprovados com Open Finance como mitigante (CASE-2025-0016, CASE-2024-0003)."',
     code: 'PRECEDENT_ANALYST: SubAgent = {"name":"precedent_analyst", …,\n  "tools":[search_precedents]}',
     source: { file: 'backend/app/agent/subagents.py', lines: [26, 34] },
-    usage: { file: 'backend/app/agent/negotiation.py', lines: [71, 71] },
+    usage: { file: 'backend/app/agent/negotiation.py', lines: [82, 82] },
   },
   await_approval: {
     label: 'await_approval', sub: 'aprovação humana', chips: ['graph', 'human', 'short'],
@@ -186,7 +207,7 @@ export const NODES: Record<string, NodeInfo> = {
     rows: [['Camada', 'LangGraph'], ['Mecanismo', 'interrupt() → Command(resume=…)'], ['Mem. curta', 'estado pausado em checkpoints'], ['Retomada', 'POST /api/approve']],
     sample: '{"__interrupt__":[{"value":{"scenario":…,"policy_refs":["POL-016"]}}]}',
     code: 'def await_approval(state):\n    verdict = interrupt(state["pending_approval"])\n    return {"pending_approval": None,\n            "decision": {**state["pending_approval"], **verdict}}',
-    source: { file: 'backend/app/graph/nodes/await_approval.py', lines: [24, 32] },
+    source: { file: 'backend/app/graph/nodes/await_approval.py', lines: [25, 40] },
     usage: { file: 'backend/app/graph/builder.py', lines: [54, 54] },
   },
   persist_decision: {
@@ -195,8 +216,17 @@ export const NODES: Record<string, NodeInfo> = {
     rows: [['Camada', 'LangGraph'], ['Escreve', 'decisions_log · historical_cases · agent_memories'], ['Embeddings', 'voyage-4-lite no resumo do novo precedente'], ['Efeito', 'a próxima busca já encontra este caso']],
     sample: '{"_id":"CASE-2026-0051","summary":"Aprovado com Open Finance…",\n "embedding":[0.021,-0.118,…]}',
     code: 'db.decisions_log.insert_one(event)\ndb.historical_cases.insert_one({**case, "embedding": embed(summary)})\nstore.put(("analyst", aid, "decision_patterns"), key, {"content": …})',
-    source: { file: 'backend/app/graph/nodes/persist_decision.py', lines: [49, 80] },
+    source: { file: 'backend/app/graph/nodes/persist_decision.py', lines: [52, 101] },
     usage: { file: 'backend/app/graph/builder.py', lines: [55, 55] },
+  },
+  contract_acceptance: {
+    label: 'contract_acceptance', sub: 'aceite e formalização', chips: ['mongo', 'short'],
+    what: 'Depois da decisão de crédito, registra o aceite da cliente sem reexecutar a análise: acrescenta a confirmação ao checkpoint e marca a proposta como contratada em applications.',
+    rows: [['Camada', 'FastAPI + MongoDB'], ['Escreve', 'checkpoints · applications.contract_status'], ['Regra', 'somente decisão aprovada'], ['Efeito', 'transição pós-decisão auditável']],
+    sample: '{"contract_status":"contracted","checkpoint":"confirmation appended"}',
+    code: 'validate_approved(application)\nappend_checkpoint_confirmation(thread_id)\napplications.update_one({"_id": thread_id}, {"$set": {"contract_status": "contracted"}})',
+    source: { file: 'backend/app/main.py', lines: [140, 234] },
+    usage: { file: 'frontend/app/page.tsx', lines: [227, 239] },
   },
   // Synthetic lane cards: the negotiation deep agent's own tool calls arrive as
   // real `status:'step'` events nested under the `negotiation` node, not as
@@ -209,7 +239,7 @@ export const NODES: Record<string, NodeInfo> = {
     sample: '{"down_payment":140000,"term_months":360} → {"ltv":0.65,"dti":0.314}',
     code: '@tool\ndef recalculate_scenario(down_payment: int, term_months: int) -> dict:\n    return calculate(product, asset_value, down_payment, term_months)',
     source: { file: 'backend/app/graph/tools/scenario.py', lines: [21, 122] },
-    usage: { file: 'backend/app/agent/negotiation.py', lines: [69, 69] },
+    usage: { file: 'backend/app/agent/negotiation.py', lines: [81, 81] },
   },
   research_tools: {
     label: 'retrieval_search', sub: 'policy_researcher · precedent_analyst', chips: ['deep', 'vector'],
@@ -217,8 +247,8 @@ export const NODES: Record<string, NodeInfo> = {
     rows: [['Camada', 'Deep Agents · subagentes'], ['Coleções', 'credit_policies · historical_cases'], ['Isolamento', 'contexto próprio por subagente']],
     sample: '"DTI de 31,4% permitido em análise manual com fator compensatório (POL-004, POL-016)."',
     code: 'subagents=[POLICY_RESEARCHER, PRECEDENT_ANALYST]',
-    source: { file: 'backend/app/graph/tools/scenario.py', lines: [125, 169] },
-    usage: { file: 'backend/app/agent/negotiation.py', lines: [69, 71] },
+    source: { file: 'backend/app/graph/tools/research.py', lines: [38, 76] },
+    usage: { file: 'backend/app/agent/negotiation.py', lines: [81, 82] },
   },
 };
 
@@ -247,6 +277,7 @@ export const TRACK_META: Record<string, TrackMeta> = {
   precedent_analyst: { short: 'cases sub', kind: 'rag', tech: 'subagente', in: 'pergunta isolada · contexto próprio' },
   await_approval: { short: 'approval', kind: 'io', tech: 'LangGraph', in: 'decisão do analista' },
   persist_decision: { short: 'persist', kind: 'data', tech: 'Atlas', in: 'assessment + trace' },
+  contract_acceptance: { short: 'contract', kind: 'data', tech: 'Atlas', in: 'aceite da cliente' },
 };
 
 export const TRACK_CUST = ['api', 'router', 'intake', 'load_context', 'policy_retrieval', 'credit_calculator', 'decision', 'customer_response'];
@@ -260,6 +291,7 @@ const PRIMARY: Record<string, ChipKey> = {
   precedent_search: 'vector', analyst_brief: 'openai', negotiation: 'deep',
   policy_researcher: 'vector', precedent_analyst: 'vector', await_approval: 'human',
   persist_decision: 'mongo', api: 'graph',
+  contract_acceptance: 'mongo',
 };
 
 export function summarizeDetail(detail?: Record<string, unknown>): string | null {
@@ -308,6 +340,7 @@ export const LANE: Record<string, Lane> = {
   analyst_brief: 'agent', negotiation: 'agent', await_approval: 'agent',
   load_context: 'data', policy_retrieval: 'data', precedent_search: 'data',
   persist_decision: 'data', research_tools: 'data',
+  contract_acceptance: 'data',
   credit_calculator: 'python', decision: 'python', scenario_tools: 'python',
 };
 
@@ -315,9 +348,17 @@ export const LANE: Record<string, Lane> = {
 // mapped to the synthetic lane card that represents them — see NODES above.
 const SUBSTEP_TO_CARD: Record<string, string> = {
   recalculate_scenario: 'scenario_tools',
+  solve_for_target_dti: 'scenario_tools',
+  solve_term_for_target_dti: 'scenario_tools',
   check_open_finance_assets: 'research_tools',
   policy_researcher: 'research_tools',
   precedent_analyst: 'research_tools',
+  audit_log: 'persist_decision',
+  application_update: 'persist_decision',
+  precedent_upsert: 'persist_decision',
+  memory_write: 'persist_decision',
+  checkpoint_confirmation: 'contract_acceptance',
+  contract_update: 'contract_acceptance',
 };
 
 // Which lane card a real `TraceEvent` should light up — collapses negotiation
@@ -327,7 +368,7 @@ export function laneCardId(event: { node: string; step?: string }): string {
   return event.step ?? event.node;
 }
 
-export const LANE_SEQ_CUST = ['router', 'intake', 'load_context', 'policy_retrieval', 'credit_calculator', 'decision', 'customer_response'];
+export const LANE_SEQ_CUST = ['router', 'intake', 'load_context', 'policy_retrieval', 'credit_calculator', 'decision', 'customer_response', 'contract_acceptance'];
 export const LANE_SEQ_ANA = ['router', 'precedent_search', 'analyst_brief', 'negotiation', 'scenario_tools', 'research_tools', 'await_approval', 'persist_decision'];
 
 export const BRANCH_CHIPS_CUST = [
@@ -335,6 +376,7 @@ export const BRANCH_CHIPS_CUST = [
   'auto_approved → resposta',
   'manual_review → fila do analista',
   'denied → resposta',
+  'approved → aceite e formalização',
 ];
 export const BRANCH_CHIPS_ANA = [
   'primeira abertura → dossiê',

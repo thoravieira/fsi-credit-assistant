@@ -100,6 +100,10 @@ export interface TraceEvent {
   node: string;
   status: 'started' | 'finished' | 'step' | 'interrupted';
   ts: number;
+  turn_id?: string;
+  turn_seq?: number;
+  turn_label?: string;
+  source?: 'chat' | 'approval' | 'contract';
   ms?: number;
   step?: string;
   detail?: Record<string, unknown>;
@@ -129,14 +133,8 @@ export interface SendChatInput {
 // ---------------------------------------------------------------------------
 const BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 
-export async function* streamChat(input: SendChatInput): AsyncGenerator<ChatStreamEvent> {
-  const res = await fetch(`${BASE_URL}/api/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ thread_id: input.threadId, persona: input.persona, message: input.message }),
-  });
-  if (!res.ok || !res.body) throw new Error(`/api/chat failed: ${res.status}`);
-
+async function* parseSse(res: Response, endpoint: string): AsyncGenerator<ChatStreamEvent> {
+  if (!res.ok || !res.body) throw new Error(`${endpoint} failed: ${res.status}`);
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -156,6 +154,27 @@ export async function* streamChat(input: SendChatInput): AsyncGenerator<ChatStre
       yield { type, ...data } as ChatStreamEvent;
     }
   }
+}
+
+export async function* streamChat(input: SendChatInput): AsyncGenerator<ChatStreamEvent> {
+  const res = await fetch(`${BASE_URL}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ thread_id: input.threadId, persona: input.persona, message: input.message }),
+  });
+  yield* parseSse(res, '/api/chat');
+}
+
+export async function* streamApproval(
+  threadId: string,
+  resume: Record<string, unknown>
+): AsyncGenerator<ChatStreamEvent> {
+  const res = await fetch(`${BASE_URL}/api/approve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ thread_id: threadId, resume }),
+  });
+  yield* parseSse(res, '/api/approve');
 }
 
 export interface CreateApplicationInput {
@@ -221,10 +240,19 @@ export async function getHistory(threadId: string, persona?: Persona): Promise<H
   return (body.messages ?? []) as HistoryMessage[];
 }
 
+export async function getRuntimeTrace(threadId: string, persona: Persona): Promise<TraceEvent[]> {
+  const params = new URLSearchParams({ persona, limit_turns: '12' });
+  const res = await fetch(`${BASE_URL}/api/runtime-trace/${encodeURIComponent(threadId)}?${params}`);
+  if (!res.ok) throw new Error(`/api/runtime-trace/${threadId} failed: ${res.status}`);
+  const body = await res.json();
+  return (body.events ?? []).map((event: Omit<TraceEvent, 'type'>) => ({ type: 'trace', ...event }));
+}
+
 export async function contractApplication(threadId: string): Promise<{
   thread_id: string;
   contract_status: 'contracted';
   contracted_at: string;
+  trace: TraceEvent[];
 }> {
   const res = await fetch(`${BASE_URL}/api/contract`, {
     method: 'POST',
@@ -247,19 +275,6 @@ export function currentDecisionOf(app: CreditApplication): Decision | null {
   if (app.final_decision?.outcome === app.status) return app.final_decision;
   if (app.latest_assessment?.decision?.outcome === app.status) return app.latest_assessment.decision;
   return app.final_decision ?? app.latest_assessment?.decision ?? null;
-}
-
-export async function approve(
-  threadId: string,
-  resume: Record<string, unknown>
-): Promise<{ stage: string; decision: Decision }> {
-  const res = await fetch(`${BASE_URL}/api/approve`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ thread_id: threadId, resume }),
-  });
-  if (!res.ok) throw new Error(`/api/approve failed: ${res.status}`);
-  return res.json();
 }
 
 export interface HealthResponse {

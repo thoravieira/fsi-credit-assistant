@@ -8,6 +8,7 @@ from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemM
 
 from app.config import get_settings
 from app.graph.state import AgentState
+from app.runtime_trace import trace_started
 
 _SYSTEM_PROMPT = (
     "Você é a assistente de crédito de um banco brasileiro, respondendo à "
@@ -50,6 +51,7 @@ def _last_human_text(messages: list[AnyMessage]) -> str:
 
 
 def customer_response(state: AgentState, *, llm: BaseChatModel | None = None) -> dict:
+    trace_started("customer_response")
     llm = llm or _default_llm()
     missing = _missing_fields(state.get("application"))
     question = _last_human_text(state.get("messages") or [])

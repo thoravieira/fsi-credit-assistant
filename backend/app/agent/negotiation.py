@@ -55,6 +55,7 @@ from app.graph.tools.scenario import (
 )
 from app.llm import get_chat_model
 from app.memory.store import get_store
+from app.runtime_trace import trace_started
 
 
 @lru_cache
@@ -87,6 +88,7 @@ def get_negotiation_agent() -> CompiledStateGraph:
 
 def negotiation(state: AgentState, config: RunnableConfig) -> dict:
     """Wrapper node: project `AgentState` in, map the agent's result back out."""
+    trace_started("negotiation")
     case = NegotiationCase(
         application=state.get("application") or {},
         profile=state.get("profile") or {},

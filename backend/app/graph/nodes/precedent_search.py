@@ -12,6 +12,7 @@ from langgraph.config import get_stream_writer
 
 from app.graph.state import AgentState
 from app.retrieval.precedents import search_precedents
+from app.runtime_trace import trace_started
 
 K = 3
 
@@ -28,6 +29,7 @@ def _case_description(application: dict, profile: dict, calc: dict, decision: di
 
 
 def precedent_search(state: AgentState) -> dict:
+    trace_started("precedent_search")
     application = state.get("application") or {}
     query = _case_description(
         application, state.get("profile") or {}, state.get("calc") or {}, state.get("decision") or {}

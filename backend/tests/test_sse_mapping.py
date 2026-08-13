@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 
 from langchain_core.messages import AIMessage, AIMessageChunk
 
-from app.main import stream_chat_events
+from app.main import stream_approval_events, stream_chat_events
 
 
 @dataclass
@@ -49,8 +49,17 @@ async def test_updates_become_started_and_finished_trace_events():
 
     events = await _collect(graph)
 
-    assert 'event: trace\ndata: {"node": "router", "status": "started"' in events[0]
-    assert 'event: trace\ndata: {"node": "router", "status": "finished"' in events[1]
+    started = json.loads(events[0].split("data: ", 1)[1])
+    finished = json.loads(events[1].split("data: ", 1)[1])
+
+    assert started["node"] == "router"
+    assert started["status"] == "started"
+    assert started["turn_id"].startswith("chat-")
+    assert started["turn_seq"] == 0
+    assert finished["node"] == "router"
+    assert finished["status"] == "finished"
+    assert finished["turn_id"] == started["turn_id"]
+    assert finished["turn_seq"] == 1
 
 
 async def test_custom_events_merge_into_finished_detail():
@@ -127,3 +136,37 @@ async def test_state_fires_once_immediately_before_done():
     assert events[-2].startswith("event: state\n")
     assert events[-1] == 'event: done\ndata: {"thread_id": "APP-1"}\n\n'
     assert sum(1 for e in events if e.startswith("event: state\n")) == 1
+
+
+async def test_approval_stream_exposes_real_persistence_milestones():
+    graph = _FakeGraph(
+        [
+            ("custom", {"trace_event": {"node": "persist_decision", "status": "started"}}),
+            (
+                "custom",
+                {
+                    "trace_event": {
+                        "node": "persist_decision",
+                        "status": "step",
+                        "step": "precedent_upsert",
+                        "detail": {"collection": "historical_cases"},
+                    }
+                },
+            ),
+            ("updates", {"persist_decision": {}}),
+        ],
+        state={"decision": {"outcome": "approved"}, "stage": "done"},
+    )
+
+    events = [event async for event in stream_approval_events(graph, "APP-1", {"outcome": "approved"})]
+    traces = [json.loads(event.split("data: ", 1)[1]) for event in events if event.startswith("event: trace\n")]
+
+    assert [(event["status"], event.get("step")) for event in traces] == [
+        ("started", None),
+        ("step", "precedent_upsert"),
+        ("finished", None),
+    ]
+    assert all(event["source"] == "approval" for event in traces)
+    assert traces[1]["detail"]["collection"] == "historical_cases"
+    assert events[-2].startswith("event: state\n")
+    assert events[-1] == 'event: done\ndata: {"thread_id": "APP-1"}\n\n'

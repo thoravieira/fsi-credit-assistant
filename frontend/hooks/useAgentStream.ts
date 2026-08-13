@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   CalcResult, Decision, PendingApproval, Persona, Scenario, SendChatInput, TraceEvent,
-  streamChat,
+  getRuntimeTrace, streamApproval, streamChat,
 } from '../lib/api';
 
 export interface ChatMessage {
@@ -25,6 +25,8 @@ export interface UseAgentStreamResult {
   scenarios: Scenario[];
   isStreaming: boolean;
   send: (message: string) => Promise<void>;
+  confirmApproval: (resume: Record<string, unknown>) => Promise<Decision | null>;
+  appendTrace: (events: TraceEvent[]) => void;
   hydrate: (data: { messages: ChatMessage[]; decision?: Decision | null }) => void;
   markContracted: (messageId: string, contracted?: boolean) => void;
 }
@@ -48,14 +50,47 @@ export function useAgentStream(threadId: string, persona: Persona): UseAgentStre
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
 
+  const appendTrace = useCallback((events: TraceEvent[]) => {
+    setTrace((previous) => {
+      const merged = [...previous];
+      const keys = new Set(
+        previous.map((event) =>
+          event.turn_id && event.turn_seq != null
+            ? `${event.turn_id}:${event.turn_seq}`
+            : `${event.source ?? 'legacy'}:${event.node}:${event.status}:${event.step ?? ''}:${event.ts}`
+        )
+      );
+      for (const event of events) {
+        const key = event.turn_id && event.turn_seq != null
+          ? `${event.turn_id}:${event.turn_seq}`
+          : `${event.source ?? 'legacy'}:${event.node}:${event.status}:${event.step ?? ''}:${event.ts}`;
+        if (!keys.has(key)) {
+          keys.add(key);
+          merged.push(event);
+        }
+      }
+      return merged.slice(-300);
+    });
+  }, []);
+
   useEffect(() => {
+    let cancelled = false;
     setTrace([]);
     setMessages([]);
     setCalc(null);
     setDecision(null);
     setPendingApproval(null);
     setScenarios([]);
-  }, [threadId]);
+    getRuntimeTrace(threadId, persona)
+      .then((events) => {
+        if (!cancelled) appendTrace(events);
+      })
+      // A new proposal has no trace yet; the first live turn will populate it.
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [threadId, persona, appendTrace]);
 
   const send = useCallback(
     async (message: string) => {
@@ -72,7 +107,7 @@ export function useAgentStream(threadId: string, persona: Persona): UseAgentStre
         for await (const evt of streamChat(input)) {
           switch (evt.type) {
             case 'trace':
-              setTrace((prev) => [...prev.slice(-59), evt]);
+              appendTrace([evt]);
               // Fast Python nodes (router, credit_calculator, decision) can
               // finish in <10ms, so their 'started' + 'finished' pair often
               // arrives in the same buffered network chunk. Without a yield
@@ -128,7 +163,34 @@ export function useAgentStream(threadId: string, persona: Persona): UseAgentStre
         setIsStreaming(false);
       }
     },
-    [threadId, persona]
+    [threadId, persona, appendTrace]
+  );
+
+  const confirmApproval = useCallback(
+    async (resume: Record<string, unknown>): Promise<Decision | null> => {
+      setIsStreaming(true);
+      let result: Decision | null = null;
+      try {
+        for await (const evt of streamApproval(threadId, resume)) {
+          if (evt.type === 'trace') {
+            appendTrace([evt]);
+            await new Promise((resolve) => requestAnimationFrame(resolve));
+          } else if (evt.type === 'state') {
+            if (evt.calc) setCalc(evt.calc);
+            if (evt.decision) {
+              result = evt.decision;
+              setDecision(evt.decision);
+            }
+            setPendingApproval(evt.pending_approval ?? null);
+            if (evt.scenarios) setScenarios(evt.scenarios);
+          }
+        }
+      } finally {
+        setIsStreaming(false);
+      }
+      return result;
+    },
+    [threadId, appendTrace]
   );
 
   // Seeds this hook's own `messages`/`decision` from data fetched elsewhere —
@@ -157,5 +219,8 @@ export function useAgentStream(threadId: string, persona: Persona): UseAgentStre
     setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, contracted } : m)));
   }, []);
 
-  return { trace, messages, calc, decision, pendingApproval, scenarios, isStreaming, send, hydrate, markContracted };
+  return {
+    trace, messages, calc, decision, pendingApproval, scenarios, isStreaming,
+    send, confirmApproval, appendTrace, hydrate, markContracted,
+  };
 }

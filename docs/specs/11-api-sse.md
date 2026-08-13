@@ -16,10 +16,11 @@
 | `POST` | `/api/chat` | **SSE.** Body `{thread_id, persona, message}`. Streams trace + tokens. |
 | `GET` | `/api/applications?status=manual_review` | Carlos's queue |
 | `GET` | `/api/applications/{id}` | Case detail + latest assessment |
-| `POST` | `/api/approve` | Resume the `interrupt()` with `Command(resume={...})` |
+| `POST` | `/api/approve` | **SSE.** Resume `interrupt()` and stream final persistence milestones |
 | `POST` | `/api/contract` | Persist customer acceptance without re-running the assessment graph |
 | `GET` | `/api/history/{thread_id}?persona=customer` | Persona-filtered checkpoint transcript |
 | `GET` | `/api/trace/{thread_id}` | Historical trace from `decisions_log` |
+| `GET` | `/api/runtime-trace/{thread_id}` | Restore the last 12 runtime turns from `trace_log` |
 | `GET` | `/api/health` | Atlas ping + index status |
 
 `/api/health` should report index readiness, not just connectivity. On Friday morning, one
@@ -33,7 +34,8 @@ Four event types. The frontend must handle all four.
 
 ```
 event: trace
-data: {"node":"policy_retrieval","status":"started","ts":1755180000.12}
+data: {"node":"policy_retrieval","status":"started","ts":1755180000.12,
+       "turn_id":"chat-...","turn_seq":3,"turn_label":"Mensagem da cliente","source":"chat"}
 
 event: trace
 data: {"node":"policy_retrieval","status":"finished","ms":812,
@@ -60,7 +62,7 @@ across negotiation turns. `ScenarioTable` (SDD 12 §1) renders from this array; 
 reconstructed from `trace` events, whose `step: "recalculate_scenario"` detail is a partial
 6-field summary for the live trace panel, not the full scenario dict.
 
-### Two further `trace` statuses, both from the analyst path
+### Two further `trace` statuses
 
 `status` is one of `started` · `finished` · **`step`** · **`interrupted`**.
 
@@ -85,6 +87,12 @@ the reserved `__interrupt__` key, whose payload is a *tuple of `Interrupt` objec
 state update — merging it into the accumulated state raises `TypeError`. It is not a finished
 node: the graph is paused, and the UI should render it as a pending human step until
 `POST /api/approve`.
+
+The approval endpoint uses the same four-event contract. During resume,
+`persist_decision` emits `audit_log`, `application_update`, `precedent_upsert`, and
+`memory_write` as real `step` events. `/api/contract` returns an equivalent trace array for
+`contract_acceptance`; because it is a short deterministic request rather than a model turn,
+it does not need SSE transport.
 
 ### Tokens from the negotiation arrive as `custom`, not as `messages`
 
@@ -157,9 +165,14 @@ need.
 
 ## 4. The trace panel must be true
 
-Every trace event originates from actual graph execution. **No simulated timings, no
-hardcoded step lists, no `setTimeout` animations.** If a node is skipped, the panel shows it
-skipped.
+Every trace event originates from actual graph execution. Timings and the list of executed
+steps are never fabricated. The optional replay uses a timer only to re-highlight the exact
+stored rows more slowly for presentation; it is labelled Replay and never claims to
+re-execute the graph. If a node is skipped, it has no runtime row.
+
+The API persists each completed runtime turn in `trace_log`. `turn_id` and `turn_seq` let the
+frontend merge restored and live rows without duplication; `source` distinguishes chat,
+human approval, and contract acceptance.
 
 The panel's entire value in the interview is that it is *evidence*. An interviewer who
 catches one fabricated step discounts everything else on screen — including the parts that

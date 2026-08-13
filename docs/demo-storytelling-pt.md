@@ -97,7 +97,12 @@ Resultado esperado:
 - parecer calculado: **aprovação automática**.
 
 Clique em **Aprovar** e depois em **Confirmar Aprovado**. Mostre que o agente apenas propõe;
-o registro definitivo só acontece após a confirmação humana.
+o registro definitivo só acontece após a confirmação humana. O caso permanece aberto para a
+plateia acompanhar quatro efeitos reais no trace: `audit_log`, `application_update`,
+`precedent_upsert` e `memory_write`. Abra `persist_decision` e diga:
+
+> Isto não é uma animação decorativa: são os marcos emitidos pela execução que acabou de
+> gravar a decisão. Se eu recarregar ou reabrir o caso, este trace volta do MongoDB.
 
 ## Cena 5 — fechar o ciclo
 
@@ -106,7 +111,9 @@ Mariana vê apenas a conversa destinada a ela, não o raciocínio interno de Car
 **Contratar**.
 
 Resultado esperado: o botão muda para **Proposta contratada**, o aceite sobrevive ao reload e
-o status aprovado não é recalculado nem substituído.
+o status aprovado não é recalculado nem substituído. No fluxo em tempo real, destaque o novo
+passo `contract_acceptance`: ele mostra separadamente a confirmação no checkpoint e a
+atualização de `applications.contract_status`.
 
 Feche com:
 
@@ -121,5 +128,7 @@ Feche com:
 - A simulação padrão de R$ 400 mil / R$ 100 mil / 360 meses cai em análise manual.
 - O caso novo aparece no topo de **Pendentes**.
 - O navegador começa na tela **Nova simulação**, sem histórico aberto.
+- O badge verde **dado real desta execução** aparece no trace; exemplos dos atalhos estão
+  identificados como **ilustrativos** e cada componente oferece **Como é testado**.
 - Se o tempo apertar, pule a pergunta sobre Selic; não pule a impossibilidade matemática nem
   o consentimento de Open Finance.

@@ -163,7 +163,13 @@ async def contract_application(body: ContractRequest, request: Request):
             "thread_id": body.thread_id,
             "contract_status": "contracted",
             "contracted_at": row["contracted_at"],
+            "trace": [],
         }
+
+    trace_events: list[dict] = []
+    decorate = _trace_decorator("customer", "contract", "Contratação")
+    started = time.perf_counter()
+    trace_events.append(decorate({"node": "contract_acceptance", "status": "started"}))
 
     accepted_text = "Aceito contratar esta proposta e seguir com a formalização do financiamento."
     confirmation_text = (
@@ -180,6 +186,16 @@ async def contract_application(body: ContractRequest, request: Request):
             ]
         },
     )
+    trace_events.append(
+        decorate(
+            {
+                "node": "contract_acceptance",
+                "status": "step",
+                "step": "checkpoint_confirmation",
+                "detail": {"store": "checkpoints", "persona": "customer"},
+            }
+        )
+    )
 
     now = datetime.now(timezone.utc)
     db["applications"].update_one(
@@ -192,10 +208,31 @@ async def contract_application(body: ContractRequest, request: Request):
             }
         },
     )
+    trace_events.append(
+        decorate(
+            {
+                "node": "contract_acceptance",
+                "status": "step",
+                "step": "contract_update",
+                "detail": {"collection": "applications", "contract_status": "contracted"},
+            }
+        )
+    )
+    trace_events.append(
+        decorate(
+            {
+                "node": "contract_acceptance",
+                "status": "finished",
+                "ms": int((time.perf_counter() - started) * 1000),
+            }
+        )
+    )
+    _write_trace_log(body.thread_id, "customer", trace_events, source="contract")
     return {
         "thread_id": body.thread_id,
         "contract_status": "contracted",
         "contracted_at": now,
+        "trace": trace_events,
     }
 
 
@@ -261,6 +298,38 @@ def get_trace(thread_id: str):
     return {"thread_id": thread_id, "events": docs}
 
 
+@app.get("/api/runtime-trace/{thread_id}")
+def get_runtime_trace(
+    thread_id: str,
+    persona: Literal["customer", "analyst"] | None = None,
+    limit_turns: int = 12,
+):
+    """Restore the exact execution traces previously shown in the UI."""
+    limit_turns = min(max(limit_turns, 1), 20)
+    query: dict = {"thread_id": thread_id}
+    if persona:
+        query["persona"] = persona
+    docs = list(
+        get_db()["trace_log"]
+        .find(query, {"_id": 0})
+        .sort("recorded_at", -1)
+        .limit(limit_turns)
+    )
+    docs.reverse()
+
+    events: list[dict] = []
+    for index, doc in enumerate(docs):
+        fallback_id = f"legacy-{thread_id}-{index}"
+        for event_index, raw in enumerate(doc.get("events") or []):
+            event = dict(raw)
+            event.setdefault("turn_id", doc.get("turn_id", fallback_id))
+            event.setdefault("turn_seq", event_index)
+            event.setdefault("turn_label", doc.get("turn_label", "Execução restaurada"))
+            event.setdefault("source", doc.get("source", "chat"))
+            events.append(event)
+    return {"thread_id": thread_id, "events": events}
+
+
 def _index_status(db, collection_name: str) -> dict:
     try:
         for idx in db[collection_name].list_search_indexes():
@@ -299,20 +368,28 @@ def _sse(event: str, data: dict) -> str:
 _background_tasks: set[asyncio.Task] = set()
 
 
-def _write_trace_log(thread_id: str, persona: str, events: list[dict]) -> None:
+def _write_trace_log(
+    thread_id: str, persona: str, events: list[dict], *, source: str = "chat"
+) -> None:
     if not events:
         return
+    first = events[0]
     get_db()["trace_log"].insert_one(
         {
             "thread_id": thread_id,
             "persona": persona,
+            "source": source,
+            "turn_id": first.get("turn_id"),
+            "turn_label": first.get("turn_label"),
             "events": events,
             "recorded_at": datetime.now(timezone.utc),
         }
     )
 
 
-def _persist_trace_log(thread_id: str, persona: str, events: list[dict]) -> None:
+def _persist_trace_log(
+    thread_id: str, persona: str, events: list[dict], *, source: str = "chat"
+) -> None:
     """Schedules the write for *after* the caller's SSE generator is done —
     called as the last statement in `stream_chat_events`, once every frame
     has already been yielded to the client. `pymongo`'s client is
@@ -321,7 +398,9 @@ def _persist_trace_log(thread_id: str, persona: str, events: list[dict]) -> None
     it means the request handler returns immediately and this write never
     sits on the customer's critical path.
     """
-    task = asyncio.create_task(asyncio.to_thread(_write_trace_log, thread_id, persona, events))
+    task = asyncio.create_task(
+        asyncio.to_thread(_write_trace_log, thread_id, persona, events, source=source)
+    )
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
 
@@ -331,6 +410,26 @@ def _persist_trace_log(thread_id: str, persona: str, events: list[dict]) -> None
 # the customer's chat window. Everything else is presentational by default, so
 # `analyst_brief` and `negotiation` stream as soon as session 6 adds them.
 _SILENT_LLM_NODES = {"intake"}
+
+
+def _trace_decorator(persona: str, source: str, turn_label: str):
+    turn_id = f"{source}-{time.time_ns()}"
+    sequence = 0
+
+    def decorate(data: dict) -> dict:
+        nonlocal sequence
+        event = {
+            "turn_id": turn_id,
+            "turn_seq": sequence,
+            "turn_label": turn_label,
+            "source": source,
+            "ts": time.time(),
+            **data,
+        }
+        sequence += 1
+        return event
+
+    return decorate
 
 
 def _is_customer_facing_token(message_chunk, meta: dict) -> bool:
@@ -437,12 +536,10 @@ async def stream_chat_events(
     """SDD 11 §2-3 — maps `astream(..., stream_mode=["updates","messages","custom"])`
     onto the four SSE event types.
 
-    `updates` only fires once a node *finishes* (verified by introspection —
-    it carries no separate start signal). `started`/`finished` are therefore
-    both emitted at that point, with `ms` measured as real wall-clock elapsed
-    since the previous node boundary — a true measurement of that node's
-    execution, not an estimate, because this graph's customer path has no
-    parallel branches.
+    Each node emits a custom `started` event on entry; `updates` supplies its
+    completion boundary. The mapper pairs both with a monotonic clock, so a
+    slow model or retrieval visibly remains active while it is really running.
+    A completion-only fallback keeps fake/legacy graphs compatible.
     """
     config = {"configurable": {"thread_id": thread_id}}
     payload = {
@@ -464,10 +561,17 @@ async def stream_chat_events(
     t_prev = time.perf_counter()
     pending_detail: dict = {}
     trace_events: list[dict] = []
+    started_at: dict[str, float] = {}
+    decorate = _trace_decorator(
+        persona,
+        "chat",
+        "Mensagem da cliente" if persona == "customer" else "Interação do analista",
+    )
 
     def emit_trace(data: dict) -> str:
-        trace_events.append(data)
-        return _sse("trace", data)
+        event = decorate(data)
+        trace_events.append(event)
+        return _sse("trace", event)
 
     async for mode, chunk in graph.astream(
         payload, config=config, stream_mode=["updates", "messages", "custom"]
@@ -484,16 +588,22 @@ async def stream_chat_events(
             # like an ordinary `detail` would leave the screen blank for the
             # whole negotiation and then print everything at once, which is the
             # failure mode SDD 06 §6 exists to prevent.
-            if "token" in chunk:
+            if "trace_event" in chunk:
+                event = chunk["trace_event"]
+                if event.get("status") == "started":
+                    started_at[event["node"]] = time.perf_counter()
+                yield emit_trace(event)
+            elif "token" in chunk:
                 yield _sse("token", {"text": chunk["token"]})
             elif "step" in chunk:
-                yield emit_trace({"status": "step", "ts": time.time(), **chunk})
+                yield emit_trace({"status": "step", **chunk})
             else:
                 pending_detail.update(chunk)
         elif mode == "updates":
             for node, update in chunk.items():
                 now = time.perf_counter()
-                ms = int((now - t_prev) * 1000)
+                start = started_at.pop(node, None)
+                ms = int((now - (start if start is not None else t_prev)) * 1000)
                 t_prev = now
 
                 # `await_approval` calling `interrupt()` arrives under the
@@ -503,10 +613,11 @@ async def stream_chat_events(
                 # waiting for `POST /api/approve`, which is exactly what the
                 # trace panel should show (SDD 06 §5).
                 if node == "__interrupt__":
-                    yield emit_trace({"node": "await_approval", "status": "interrupted", "ts": time.time()})
+                    yield emit_trace({"node": "await_approval", "status": "interrupted"})
                     continue
 
-                yield emit_trace({"node": node, "status": "started", "ts": time.time() - ms / 1000})
+                if start is None:
+                    yield emit_trace({"node": node, "status": "started"})
                 event = {"node": node, "status": "finished", "ms": ms}
                 if pending_detail:
                     event["detail"] = pending_detail
@@ -541,7 +652,65 @@ async def stream_chat_events(
 
     # Item 10 — persist the same trace the panel just showed, after every SSE
     # frame for this turn has already reached the client.
-    _persist_trace_log(thread_id, persona, trace_events)
+    _persist_trace_log(thread_id, persona, trace_events, source="chat")
+
+
+async def stream_approval_events(graph, thread_id: str, resume: dict) -> AsyncIterator[str]:
+    """Resume the human gate and stream persistence milestones as they happen."""
+    config = {"configurable": {"thread_id": thread_id}}
+    trace_events: list[dict] = []
+    pending_detail: dict = {}
+    started_at: dict[str, float] = {}
+    decorate = _trace_decorator("analyst", "approval", "Decisão humana e persistência")
+    t_prev = time.perf_counter()
+
+    def emit_trace(data: dict) -> str:
+        event = decorate(data)
+        trace_events.append(event)
+        return _sse("trace", event)
+
+    async for mode, chunk in graph.astream(
+        Command(resume=resume), config=config, stream_mode=["updates", "custom"]
+    ):
+        if mode == "custom":
+            if "trace_event" in chunk:
+                event = chunk["trace_event"]
+                if event.get("status") == "started":
+                    started_at[event["node"]] = time.perf_counter()
+                yield emit_trace(event)
+            else:
+                pending_detail.update(chunk)
+            continue
+
+        for node, _update in chunk.items():
+            if node == "__interrupt__":
+                yield emit_trace({"node": "await_approval", "status": "interrupted"})
+                continue
+            now = time.perf_counter()
+            start = started_at.pop(node, None)
+            ms = int((now - (start if start is not None else t_prev)) * 1000)
+            t_prev = now
+            if start is None:
+                yield emit_trace({"node": node, "status": "started"})
+            event = {"node": node, "status": "finished", "ms": ms}
+            if pending_detail:
+                event["detail"] = pending_detail
+                pending_detail = {}
+            yield emit_trace(event)
+
+    final_values = (await graph.aget_state(config)).values
+    yield _sse(
+        "state",
+        {
+            "stage": final_values.get("stage"),
+            "calc": final_values.get("calc"),
+            "decision": final_values.get("decision"),
+            "pending_approval": final_values.get("pending_approval"),
+            "scenarios": final_values.get("scenarios"),
+        },
+    )
+    yield _sse("done", {"thread_id": thread_id})
+    _persist_trace_log(thread_id, "analyst", trace_events, source="approval")
 
 
 @app.post("/api/chat")
@@ -556,6 +725,7 @@ async def chat(body: ChatRequest, request: Request):
 @app.post("/api/approve")
 async def approve(body: ApproveRequest, request: Request):
     graph = request.app.state.graph
-    config = {"configurable": {"thread_id": body.thread_id}}
-    result = await graph.ainvoke(Command(resume=body.resume), config=config)
-    return {"stage": result.get("stage"), "decision": result.get("decision")}
+    return StreamingResponse(
+        stream_approval_events(graph, body.thread_id, body.resume),
+        media_type="text/event-stream",
+    )

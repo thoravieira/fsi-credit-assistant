@@ -19,6 +19,7 @@ services:
       dockerfile: ../Dockerfile.web
       args:
         NEXT_PUBLIC_API_URL: http://localhost:8000
+        NEXT_PUBLIC_GIT_REF: ${GIT_REF:-fix/inverse-simulation-and-journey-ux}
     ports:
       - "3000:3000"
     depends_on:

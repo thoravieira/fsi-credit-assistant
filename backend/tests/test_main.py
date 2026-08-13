@@ -7,6 +7,7 @@ manager on purpose: that runs `lifespan`, which compiles the real graph.
 """
 
 import json
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 import pytest
@@ -230,7 +231,7 @@ def chat_thread():
     db = get_db()
     db["applications"].delete_one({"_id": application_id})
     db["decisions_log"].delete_many({"application_id": application_id})
-    for collection in ("checkpoints", "checkpoint_writes"):
+    for collection in ("checkpoints", "checkpoint_writes", "trace_log"):
         db[collection].delete_many({"thread_id": application_id})
 
 
@@ -404,8 +405,18 @@ def test_contract_keeps_the_human_verdict_and_filters_customer_history(chat_thre
 
         response = running_client.post("/api/contract", json={"thread_id": chat_thread})
         assert response.status_code == 200
+        contract_body = response.json()
+        assert [event["status"] for event in contract_body["trace"]] == [
+            "started", "step", "step", "finished"
+        ]
+        assert [event.get("step") for event in contract_body["trace"]] == [
+            None, "checkpoint_confirmation", "contract_update", None
+        ]
+        assert all(event["node"] == "contract_acceptance" for event in contract_body["trace"])
+        assert all(event["source"] == "contract" for event in contract_body["trace"])
         second = running_client.post("/api/contract", json={"thread_id": chat_thread})
         assert second.status_code == 200
+        assert second.json()["trace"] == []
 
         customer_history = running_client.get(
             f"/api/history/{chat_thread}", params={"persona": "customer"}
@@ -423,6 +434,54 @@ def test_contract_keeps_the_human_verdict_and_filters_customer_history(chat_thre
     assert [message["text"] for message in analyst_history] == ["Pergunta interna.", "Parecer interno."]
     assert sum("Aceito contratar" in message["text"] for message in customer_history) == 1
     assert sum("Aceite registrado" in message["text"] for message in customer_history) == 1
+    stored_trace = get_db()["trace_log"].find_one(
+        {"thread_id": chat_thread, "source": "contract"}
+    )
+    assert stored_trace is not None
+    assert stored_trace["turn_label"] == "Contratação"
+
+
+def test_runtime_trace_restores_only_the_requested_persona(chat_thread):
+    db = get_db()
+    db["trace_log"].insert_many(
+        [
+            {
+                "thread_id": chat_thread,
+                "persona": "customer",
+                "source": "chat",
+                "turn_id": "chat-customer",
+                "turn_label": "Mensagem da cliente",
+                "recorded_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
+                "events": [{"node": "router", "status": "started", "ts": 1.0}],
+            },
+            {
+                "thread_id": chat_thread,
+                "persona": "analyst",
+                "source": "approval",
+                "turn_id": "approval-analyst",
+                "turn_label": "Decisão humana e persistência",
+                "recorded_at": datetime(2026, 1, 2, tzinfo=timezone.utc),
+                "events": [{"node": "persist_decision", "status": "finished", "ts": 2.0}],
+            },
+        ]
+    )
+
+    response = client.get(
+        f"/api/runtime-trace/{chat_thread}", params={"persona": "analyst"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["events"] == [
+        {
+            "node": "persist_decision",
+            "status": "finished",
+            "ts": 2.0,
+            "turn_id": "approval-analyst",
+            "turn_seq": 0,
+            "turn_label": "Decisão humana e persistência",
+            "source": "approval",
+        }
+    ]
 
 
 def test_trace_endpoint_returns_the_persisted_events(chat_thread):
@@ -435,16 +494,13 @@ def test_trace_endpoint_returns_the_persisted_events(chat_thread):
     assert events[0]["seq"] == 1
 
 
-def test_approve_is_still_blocked_on_the_analyst_path(chat_thread):
-    """SDD 11 acceptance — "/api/approve resumes an interrupted thread and the
-    graph reaches `persist_decision`" cannot be asserted yet: `await_approval`
-    and `persist_decision` are session 6, so no thread ever has a pending
-    `interrupt()` to resume.
+def test_approve_without_a_pending_interrupt_fails_closed(chat_thread):
+    """A resume is valid only for a graph paused at `await_approval`.
 
-    `Command(resume=...)` against a thread with nothing suspended does not
-    resume; it starts a fresh run whose only input is the resume value, so
-    `router` gets a state with no `persona`. This is the canary for session 6 —
-    replace it with a real approve test once `await_approval` lands.
+    Against a fresh thread LangGraph starts a run with only the resume value;
+    routing has no persona and fails instead of inventing an approval. The real
+    approval stream and its persistence milestones are covered in
+    `test_sse_mapping.py` and the graph-level interrupt/resume test.
     """
     with pytest.raises(KeyError, match="persona"):
         with TestClient(app) as running_client:

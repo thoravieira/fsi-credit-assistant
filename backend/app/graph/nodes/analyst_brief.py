@@ -16,6 +16,7 @@ from app.audit import append_event
 from app.config import DEMO_ANALYST_ID
 from app.graph.state import AgentState
 from app.llm import get_chat_model
+from app.runtime_trace import trace_started
 
 _SYSTEM_PROMPT = (
     "Você prepara o dossiê de um caso de crédito para um analista brasileiro. "
@@ -41,6 +42,7 @@ def _precedent_lines(precedents: list[dict]) -> str:
 
 
 def analyst_brief(state: AgentState, *, llm: BaseChatModel | None = None) -> dict:
+    trace_started("analyst_brief")
     llm = llm or _default_llm()
     application = state.get("application") or {}
     decision = state.get("decision") or {}

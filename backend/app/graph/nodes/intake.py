@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from app.config import get_settings
 from app.graph.routing import has_complete_application
 from app.graph.state import AgentState
+from app.runtime_trace import trace_started
 
 _SYSTEM_PROMPT = (
     "Você extrai parâmetros de um pedido de crédito a partir de mensagens em "
@@ -108,6 +109,7 @@ def _last_human_text(messages: list[AnyMessage]) -> str:
 
 
 def intake(state: AgentState, *, llm: BaseChatModel | None = None) -> dict:
+    trace_started("intake")
     llm = llm or _default_llm()
     prior = dict(state.get("application") or {})
     text = _last_human_text(state["messages"])

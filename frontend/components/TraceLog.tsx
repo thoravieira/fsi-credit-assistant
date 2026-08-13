@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import type { TraceEvent } from '../lib/api';
-import { chipOf, dotOf, fmtMs, summarizeDetail } from '../lib/archMeta';
+import { chipOf, dotOf, fmtMs, laneCardId, summarizeDetail } from '../lib/archMeta';
 
 const SPEED_STORAGE_KEY = 'fsi-replay-speed';
 const SPEEDS = [0.5, 1] as const;
@@ -25,13 +25,26 @@ interface Group {
   rows: TraceEvent[];
 }
 
-// Splits the flat `trace` array into turns: every real turn starts with a
-// `router` node (both TRACK_CUST and TRACK_ANA in `archMeta` begin there),
-// so a `router`/`started` event is the boundary — no separate "turn id"
-// exists on `TraceEvent` itself, so this is derived, not stored.
+// Current events carry a durable `turn_id`; the router boundary remains only
+// as a fallback for traces written by older versions of the demo.
 function groupByTurn(trace: TraceEvent[]): Group[] {
   const groups: Group[] = [];
+  const byId = new Map<string, Group>();
   trace.forEach((r) => {
+    if (r.turn_id) {
+      let group = byId.get(r.turn_id);
+      if (!group) {
+        const ordinal = groups.length + 1;
+        group = {
+          label: `Turno ${ordinal}${r.turn_label ? ' · ' + r.turn_label : ''}`,
+          rows: [],
+        };
+        byId.set(r.turn_id, group);
+        groups.push(group);
+      }
+      group.rows.push(r);
+      return;
+    }
     const startsNewTurn = r.node === 'router' && r.status === 'started';
     if (startsNewTurn || groups.length === 0) {
       groups.push({ label: 'Turno ' + (groups.length + 1), rows: [r] });
@@ -75,12 +88,19 @@ export function TraceLog({
     localStorage.setItem(SPEED_STORAGE_KEY, String(s));
   };
 
-  const groups = groupByTurn(trace).slice(-5);
+  const groups = groupByTurn(trace).slice(-12);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-surface">
       <div className="flex flex-none items-baseline justify-between px-[18px] pb-[7px] pt-[11px]">
-        <span className="text-[12px] font-extrabold uppercase tracking-[0.05em]">Trace ao vivo</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[12px] font-extrabold uppercase tracking-[0.05em]">Trace ao vivo</span>
+          {trace.length > 0 && (
+            <span className="bg-[#D7F4E3] px-1.5 py-0.5 text-[8.5px] font-extrabold uppercase tracking-[0.05em] text-forest">
+              dado real desta execução
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2.5">
           <span className="text-[10px] text-charcoal/50">
             {trace.length ? trace.length + ' eventos · clique num passo para abrir os dados' : ''}
@@ -106,7 +126,7 @@ export function TraceLog({
           const total = g.rows.reduce((a, r) => a + (r.ms ?? 0), 0);
           const replaying = replayingLabel === g.label;
           return (
-            <div key={gi} className="mb-3">
+            <div key={g.rows[0]?.turn_id ?? gi} className="mb-3">
               <div className="mb-[3px] flex items-center gap-2 border-b-2 border-charcoal/40 py-[5px]">
                 <button
                   onClick={() => onReplay(g.label, g.rows, speed)}
@@ -120,7 +140,7 @@ export function TraceLog({
                 <span className="font-mono text-[9.5px] text-charcoal/50">{g.rows.length} passos · {fmtMs(total)}</span>
               </div>
               {g.rows.map((row, ri) => {
-                const key = row.step ?? row.node;
+                const key = laneCardId(row);
                 const chip = chipOf(key);
                 const label = row.status === 'step' ? row.node + ' · ' + row.step : row.node;
                 const detail = summarizeDetail(row.detail) ?? statusFallback(row.status);
