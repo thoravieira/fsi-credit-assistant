@@ -144,7 +144,11 @@ def test_customer_path_runs_end_to_end(graph, thread):
     """
     extractor = _FakeExtractor(
         _ExtractedFields(
-            product="mortgage", asset_value=400_000.0, down_payment=100_000.0, term_months=360
+            product="mortgage",
+            asset_value=400_000.0,
+            down_payment=100_000.0,
+            term_months=360,
+            purpose="Compra de imóvel residencial",
         )
     )
     payload = _payload(thread, "Quero financiar um apartamento de 400 mil com 100 mil de entrada")
@@ -222,7 +226,11 @@ def test_two_turns_on_one_thread_accumulate_messages_and_overwrite_calc(graph, t
         first,
         _FakeExtractor(
             _ExtractedFields(
-                product="mortgage", asset_value=400_000.0, down_payment=180_000.0, term_months=360
+                product="mortgage",
+                asset_value=400_000.0,
+                down_payment=180_000.0,
+                term_months=360,
+                purpose="Compra de imóvel residencial",
             )
         ),
     )

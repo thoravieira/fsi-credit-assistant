@@ -17,15 +17,16 @@ export function useReplay() {
   useEffect(() => clear, [clear]);
 
   const start = useCallback(
-    (label: string, rows: TraceEvent[]) => {
+    (label: string, rows: TraceEvent[], speed = 1) => {
       clear();
       let t = 0;
+      const step = 480 / speed; // speed 0.5x → 960ms/step, 1x → 480ms/step
       rows.forEach((row) => {
-        t += 480;
+        t += step;
         const nodeId = row.step ?? row.node;
         timers.current.push(setTimeout(() => setReplay({ label, nodeId }), t));
       });
-      timers.current.push(setTimeout(() => setReplay(null), t + 500));
+      timers.current.push(setTimeout(() => setReplay(null), t + 500 / speed));
     },
     [clear]
   );

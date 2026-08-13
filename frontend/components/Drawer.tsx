@@ -1,6 +1,7 @@
 'use client';
+import { useState } from 'react';
 import type { TraceEvent } from '../lib/api';
-import { CHIP, NODES, chipOf, fmtMs } from '../lib/archMeta';
+import { CHIP, NODES, chipOf, fmtMs, githubUrl, type SourceRef } from '../lib/archMeta';
 
 export type DrawerState =
   | { kind: 'node'; id: string }
@@ -26,6 +27,7 @@ function stringifyDetailValue(v: unknown): string {
 // real `TraceEvent.detail` from that exact event, falling back to reference
 // copy only when the event hasn't reported detail yet — e.g. `started` rows).
 export function Drawer({ state, onClose }: { state: DrawerState; onClose: () => void }) {
+  const [usageOpen, setUsageOpen] = useState(false);
   if (!state) return null;
 
   let kicker: string, title: string, subtitle: string, what: string;
@@ -33,6 +35,8 @@ export function Drawer({ state, onClose }: { state: DrawerState; onClose: () => 
   let rows: [string, string][];
   let sampleLabel: string, sample: string | undefined;
   let code: string | undefined;
+  let source: SourceRef | undefined;
+  let usage: SourceRef | undefined;
 
   if (state.kind === 'node') {
     const info = NODES[state.id];
@@ -46,6 +50,8 @@ export function Drawer({ state, onClose }: { state: DrawerState; onClose: () => 
     sampleLabel = 'Exemplo típico deste passo';
     sample = info.sample;
     code = info.code;
+    source = info.source;
+    usage = info.usage;
   } else {
     const { event, groupLabel } = state;
     const key = event.step ?? event.node;
@@ -67,6 +73,8 @@ export function Drawer({ state, onClose }: { state: DrawerState; onClose: () => 
       sample = info?.sample;
     }
     code = info?.code;
+    source = info?.source;
+    usage = info?.usage;
   }
 
   return (
@@ -110,8 +118,50 @@ export function Drawer({ state, onClose }: { state: DrawerState; onClose: () => 
 
         {code && (
           <div>
-            <div className="mb-1.5 text-[9.5px] font-extrabold uppercase tracking-[0.06em] text-charcoal/50">Implementação</div>
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <span className="text-[9.5px] font-extrabold uppercase tracking-[0.06em] text-charcoal/50">
+                Implementação{source && <span className="ml-1.5 font-mono normal-case text-charcoal/40">· {source.file}:{source.lines[0]}-{source.lines[1]}</span>}
+              </span>
+              {source && (
+                <a
+                  href={githubUrl(source.file, source.lines)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex-none border border-forest px-2 py-[3px] text-[9.5px] font-bold text-forest hover:bg-forest hover:text-white"
+                >
+                  Abrir no GitHub ↗
+                </a>
+              )}
+            </div>
+            {/* Expanded by default — this is the code actually implemented for
+                this step (item 9). */}
             <pre className="overflow-auto whitespace-pre-wrap border border-charcoal/25 bg-white p-3 font-mono text-[10.5px] leading-[1.6] text-charcoal">{code}</pre>
+          </div>
+        )}
+
+        {usage && (
+          <div className="border-t border-charcoal/[0.18] pt-3">
+            {/* Collapsed by default — where this is wired into the graph,
+                not the implementation itself (item 9). */}
+            <button
+              onClick={() => setUsageOpen((o) => !o)}
+              className="flex w-full items-center justify-between border-none bg-transparent p-0 text-left"
+            >
+              <span className="text-[9.5px] font-extrabold uppercase tracking-[0.06em] text-charcoal/50">
+                Onde é usado <span className="font-mono normal-case text-charcoal/40">· {usage.file}:{usage.lines[0]}{usage.lines[1] !== usage.lines[0] ? '-' + usage.lines[1] : ''}</span>
+              </span>
+              <span className="text-[10px] text-charcoal/40">{usageOpen ? '▲' : '▼'}</span>
+            </button>
+            {usageOpen && (
+              <a
+                href={githubUrl(usage.file, usage.lines)}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-block border border-forest px-2 py-[3px] text-[9.5px] font-bold text-forest hover:bg-forest hover:text-white"
+              >
+                Abrir no GitHub ↗
+              </a>
+            )}
           </div>
         )}
       </div>

@@ -151,7 +151,7 @@ def render_threshold(threshold: Threshold) -> str:
 # --- Fact extraction -------------------------------------------------------
 
 
-def _age_at_maturity(birth_date: Any, term_months: int, today: date) -> float | None:
+def age_at_maturity(birth_date: Any, term_months: int, today: date) -> float | None:
     """`current_age_years + term_months / 12` (SDD 10 §3). Returns `None` when
     the profile carries no usable birth date — the caller treats that as
     "cannot confirm", never as "passes".
@@ -195,7 +195,7 @@ def evaluate(
     amount = float(application["requested_amount"])
     score = credit.get("internal_score")
     income_verified = income.get("verified")
-    age = _age_at_maturity(profile.get("birth_date"), int(application["term_months"]), today)
+    age = age_at_maturity(profile.get("birth_date"), int(application["term_months"]), today)
 
     breaches: list[tuple[Threshold, str]] = []
 

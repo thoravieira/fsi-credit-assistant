@@ -13,19 +13,53 @@ import {
   createApplication, currentDecisionOf, fmtBRL, getApplication, getHistory, listApplications, previewFinanced, previewLtv,
 } from '../lib/api';
 import type { ChatMessage } from '../hooks/useAgentStream';
+import type { Product } from '../lib/api';
 
 // The seeded demo persona (data/profiles/profiles.json) — renda líquida
 // R$ 11.200, dívida existente R$ 1.350, score interno 782 (SDD 16 §2).
 const CUSTOMER_ID = 'CUST-0001';
 
+// Per-product defaults so switching the picker lands on sane numbers instead
+// of e.g. a R$400k "veículo" — SDD 16 §2 only seeds a mortgage profile for
+// CUST-0001, so auto is a real product (POL-002/003/005/009/019/021) simulated
+// against the same seeded income/score, not a separate persona.
+const PRODUCT_DEFAULTS: Record<
+  Product,
+  { assetValue: number; downPayment: number; termMonths: number; purpose: string; terms: number[]; purposes: string[] }
+> = {
+  mortgage: {
+    assetValue: 400000, downPayment: 100000, termMonths: 360, purpose: 'Compra de imóvel residencial',
+    terms: [180, 240, 300, 360, 420],
+    purposes: ['Compra de imóvel residencial', 'Reforma do imóvel', 'Troca de imóvel'],
+  },
+  auto: {
+    assetValue: 80000, downPayment: 16000, termMonths: 48, purpose: 'Compra de veículo novo',
+    terms: [12, 24, 36, 48, 60],
+    purposes: ['Compra de veículo novo', 'Compra de veículo usado', 'Troca de veículo'],
+  },
+};
+
 export default function CustomerPage() {
+  const [product, setProduct] = useState<Product>('mortgage');
   const [assetValue, setAssetValue] = useState(400000);
   const [downPayment, setDownPayment] = useState(100000);
   const [termMonths, setTermMonths] = useState(360);
   const [purpose, setPurpose] = useState('Compra de imóvel residencial');
+
+  // Switching product resets the form to that product's own sane range —
+  // POL-024's 20% entrada mínima for mortgage and POL-025's 10%/20% for auto
+  // are worlds apart, so carrying over a mortgage-scale down payment onto a
+  // vehicle would just misrepresent the simulation, not merely look odd.
+  const switchProduct = (p: Product) => {
+    setProduct(p);
+    const d = PRODUCT_DEFAULTS[p];
+    setAssetValue(d.assetValue);
+    setDownPayment(d.downPayment);
+    setTermMonths(d.termMonths);
+    setPurpose(d.purpose);
+  };
   const [threadId, setThreadId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(true);
-  const [traceExpanded, setTraceExpanded] = useState(false);
   const [drawer, setDrawer] = useState<DrawerState>(null);
   const [focus, setFocus] = useState<FocusState | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -50,7 +84,7 @@ export default function CustomerPage() {
 
       const id = await createApplication({
         customer_id: CUSTOMER_ID,
-        product: 'mortgage',
+        product,
         asset_value: assetValue,
         down_payment: downPayment,
         term_months: termMonths,
@@ -67,7 +101,7 @@ export default function CustomerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once on mount; a reused thread keeps its own history, these are only the fallback for creating a brand new one
   }, []);
 
-  const { trace, messages, decision, isStreaming, send, hydrate } = useAgentStream(threadId ?? '', 'customer');
+  const { trace, messages, decision, isStreaming, send, hydrate, markContracted } = useAgentStream(threadId ?? '', 'customer');
   const { replay, start: startReplay } = useReplay();
   const financed = previewFinanced(assetValue, downPayment);
   const ltv = previewLtv(assetValue, downPayment);
@@ -84,8 +118,10 @@ export default function CustomerPage() {
   const simulate = () => {
     if (!threadId) return;
     setFormOpen(false);
+    const noun = product === 'auto' ? 'veículo' : 'imóvel';
+    const label = product === 'auto' ? 'financiamento de veículo' : 'financiamento imobiliário';
     sendAndReset(
-      `Simular financiamento imobiliário: imóvel de ${fmtBRL(assetValue)}, entrada de ${fmtBRL(downPayment)}, ` +
+      `Simular ${label}: ${noun} de ${fmtBRL(assetValue)}, entrada de ${fmtBRL(downPayment)}, ` +
         `prazo de ${termMonths} meses. Finalidade: ${purpose}.`
     );
   };
@@ -111,6 +147,16 @@ export default function CustomerPage() {
     }
   };
 
+  // "Contratar" (item 6): a real chat turn, not a local-only flag — it goes
+  // through the same `/api/chat` pipeline as any message, so it lands in the
+  // LangGraph checkpoint and survives a history reload. `markContracted`
+  // flips the button to its confirmed state immediately rather than waiting
+  // for the round trip, since the outcome here is never in doubt.
+  const onContract = (m: ChatMessage) => {
+    markContracted(m.id);
+    sendAndReset('Aceito contratar esta proposta e seguir com a formalização do financiamento.');
+  };
+
   return (
     <AppShell
       leftBg="#eae9e9"
@@ -118,6 +164,10 @@ export default function CustomerPage() {
         <div className="flex flex-1 items-start justify-center overflow-auto p-5">
           <IOSDevice dark width={390} height={800}>
             <CustomerApp
+              product={product}
+              setProduct={switchProduct}
+              termOptions={PRODUCT_DEFAULTS[product].terms}
+              purposeOptions={PRODUCT_DEFAULTS[product].purposes}
               assetValue={assetValue}
               setAssetValue={setAssetValue}
               downPayment={downPayment}
@@ -138,8 +188,7 @@ export default function CustomerPage() {
               messages={messages}
               onSend={sendAndReset}
               decision={decision}
-              traceExpanded={traceExpanded}
-              onToggleTrace={() => setTraceExpanded((o) => !o)}
+              onContract={onContract}
             />
           </IOSDevice>
         </div>
@@ -159,9 +208,9 @@ export default function CustomerPage() {
             setFocus({ nodeId: laneCardId(event), event });
             setDrawer({ kind: 'row', event, groupLabel });
           }}
-          onReplay={(label, rows) => {
+          onReplay={(label, rows, speed) => {
             setFocus(null);
-            startReplay(label, rows);
+            startReplay(label, rows, speed);
           }}
         />
       }

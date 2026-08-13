@@ -15,7 +15,15 @@ def route(state: AgentState) -> str:
 def has_complete_application(state: AgentState) -> str:
     app = state.get("application")
     required = ("product", "asset_value", "down_payment", "term_months")
-    return "complete" if app and all(app.get(f) is not None for f in required) else "incomplete"
+    # `purpose` is truthy-checked, not `is not None`: `POST /api/applications`
+    # defaults it to `""` (CreateApplicationRequest), which would otherwise
+    # slip past a `None` check and let a scenario run — or be solved for
+    # (SDD 12 follow-up, item 2) — without ever having been asked for.
+    return (
+        "complete"
+        if app and all(app.get(f) is not None for f in required) and app.get("purpose")
+        else "incomplete"
+    )
 
 
 def needs_approval(state: AgentState) -> str:

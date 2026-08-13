@@ -9,6 +9,7 @@ import { Drawer, type DrawerState } from '../../components/Drawer';
 import { laneCardId } from '../../lib/archMeta';
 import { DecisionCard } from '../../components/DecisionCard';
 import { ChatThread } from '../../components/ChatThread';
+import { Markdown } from '../../lib/markdown';
 import { ScenarioTable } from '../../components/ScenarioTable';
 import { CaseQueue, toPendingCase } from '../../components/CaseQueue';
 import {
@@ -26,6 +27,24 @@ const LEVERS = [
   { key: 'extend_term', label: 'Estender prazo (420 meses)', prompt: 'Estenda o prazo do financiamento para 420 meses, mantendo os demais parâmetros, e recalcule.' },
   { key: 'open_finance', label: 'Solicitar Open Finance', prompt: 'Consulte os ativos elegíveis via Open Finance da cliente e avalie se servem como fator compensatório para a proposta atual.' },
 ];
+
+// Item 8: which 1-2 levers are actually plausible for *this* decision, not a
+// static row of all three every turn. Read off the same `policy_refs`/
+// `reasons` the decision itself cites (POL-001..003 = LTV, POL-004/005 = DTI)
+// so the suggestion tracks whatever the real decision breached, not a guess.
+function pickLevers(decision: ReturnType<typeof currentDecisionOf> | null): typeof LEVERS {
+  if (!decision || decision.outcome === 'approved' || decision.outcome === 'approved_with_conditions') return [];
+  const refs = decision.policy_refs.join(' ');
+  const text = (decision.reasons ?? []).join(' ').toLowerCase() + ' ' + (decision.rationale ?? '').toLowerCase();
+  const ltvIssue = /pol-00[123]\b/.test(refs) || text.includes('ltv');
+  const dtiIssue = /pol-00[45]\b/.test(refs) || text.includes('comprometimento de renda');
+
+  const picks: string[] = [];
+  if (ltvIssue) picks.push('reduce_amount');
+  if (dtiIssue) picks.push('extend_term', 'open_finance');
+  if (!picks.length) picks.push('reduce_amount', 'open_finance'); // no clear signal yet — the two most broadly useful levers
+  return LEVERS.filter((l) => picks.includes(l.key)).slice(0, 2);
+}
 
 const TAB_LABEL = { pending: 'Pendentes', approved: 'Aprovados', denied: 'Reprovações' } as const;
 
@@ -95,11 +114,6 @@ export default function ConsolePage() {
   // the same thread and it comes back denied (found live, see memory).
   const shownDecision = decision ?? (selectedApp ? currentDecisionOf(selectedApp) : null);
 
-  const runLever = (key: string) => {
-    const lever = LEVERS.find((l) => l.key === key);
-    if (lever) sendAndReset(lever.prompt);
-  };
-
   const stateVerdict = (outcome: 'approved' | 'denied') => {
     sendAndReset(outcome === 'approved' ? 'Aprovar a proposta apresentada.' : 'Reprovar a proposta, não seguir com o crédito.');
   };
@@ -158,7 +172,15 @@ export default function ConsolePage() {
 
               {shownDecision && <DecisionCard decision={shownDecision} />}
               <ScenarioTable scenarios={scenarios} />
-              {messages.length > 0 && <ChatThread messages={messages} onSend={sendAndReset} disabled={isStreaming} placeholder="Pedir recomendação ou contraproposta…" />}
+              {messages.length > 0 && (
+                <ChatThread
+                  messages={messages}
+                  onSend={sendAndReset}
+                  disabled={isStreaming}
+                  placeholder="Pedir recomendação ou contraproposta…"
+                  suggestions={!pendingApproval && !isStreaming ? pickLevers(shownDecision) : undefined}
+                />
+              )}
 
               <div className="flex flex-col gap-2.5 border border-charcoal/[0.25] bg-white p-3.5">
                 {pendingApproval ? (
@@ -166,23 +188,16 @@ export default function ConsolePage() {
                     <div className="text-[11.5px] font-bold text-charcoal/70">
                       Proposta do agente: <span className="text-forest">{OUTCOME_LABELS[pendingApproval.outcome] ?? pendingApproval.outcome}</span> — aguardando confirmação humana.
                     </div>
-                    <p className="max-h-24 overflow-auto text-[12px] leading-relaxed text-charcoal/70">{pendingApproval.rationale}</p>
+                    <Markdown text={pendingApproval.rationale} className="max-h-24 overflow-auto text-[12px] leading-relaxed text-charcoal/70" />
                     <button onClick={confirmApproval} disabled={confirming} className="border-none bg-spring py-3 text-[13px] font-extrabold text-ink disabled:opacity-50">
                       {confirming ? 'Confirmando…' : 'Confirmar ' + (OUTCOME_LABELS[pendingApproval.outcome] ?? pendingApproval.outcome)}
                     </button>
                   </>
                 ) : (
                   <>
-                    <div className="flex flex-wrap gap-1.5">
-                      {LEVERS.map((l) => (
-                        <button key={l.key} disabled={isStreaming} onClick={() => runLever(l.key)} className="border border-charcoal/30 bg-white px-3 py-1.5 text-[11.5px] font-semibold disabled:opacity-40">
-                          {l.label}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="flex gap-2.5 border-t border-charcoal/[0.18] pt-2.5">
-                      <button onClick={() => stateVerdict('approved')} disabled={isStreaming} className="flex-1 border-none bg-spring py-3 text-left text-[13px] font-extrabold text-ink disabled:opacity-50">Aprovar</button>
-                      <button onClick={() => stateVerdict('denied')} disabled={isStreaming} className="flex-1 border border-charcoal/40 bg-transparent py-3 text-left text-[13px] font-bold text-charcoal disabled:opacity-50">Reprovar</button>
+                    <div className="flex gap-2.5">
+                      <button onClick={() => stateVerdict('approved')} disabled={isStreaming} className="flex-1 border-none bg-spring py-3 text-center text-[13px] font-extrabold text-ink disabled:opacity-50">Aprovar</button>
+                      <button onClick={() => stateVerdict('denied')} disabled={isStreaming} className="flex-1 border border-charcoal/40 bg-transparent py-3 text-center text-[13px] font-bold text-charcoal disabled:opacity-50">Reprovar</button>
                     </div>
                   </>
                 )}
@@ -206,9 +221,9 @@ export default function ConsolePage() {
             setFocus({ nodeId: laneCardId(event), event });
             setDrawer({ kind: 'row', event, groupLabel });
           }}
-          onReplay={(label, rows) => {
+          onReplay={(label, rows, speed) => {
             setFocus(null);
-            startReplay(label, rows);
+            startReplay(label, rows, speed);
           }}
         />
       }

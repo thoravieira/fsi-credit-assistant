@@ -7,6 +7,7 @@ so the app module itself, and the five endpoints that don't touch the graph,
 work today.
 """
 
+import asyncio
 import json
 import time
 from contextlib import asynccontextmanager
@@ -199,6 +200,41 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, default=str, ensure_ascii=False)}\n\n"
 
 
+# Item 10 — a durable copy of "Trace ao vivo" in its own collection. Kept as a
+# module-level set only so a fire-and-forget `asyncio.create_task` isn't
+# garbage-collected mid-write once `stream_chat_events` returns and its local
+# variables go out of scope (asyncio's own recommendation for tasks nobody
+# awaits — see `asyncio.create_task` docs).
+_background_tasks: set[asyncio.Task] = set()
+
+
+def _write_trace_log(thread_id: str, persona: str, events: list[dict]) -> None:
+    if not events:
+        return
+    get_db()["trace_log"].insert_one(
+        {
+            "thread_id": thread_id,
+            "persona": persona,
+            "events": events,
+            "recorded_at": datetime.now(timezone.utc),
+        }
+    )
+
+
+def _persist_trace_log(thread_id: str, persona: str, events: list[dict]) -> None:
+    """Schedules the write for *after* the caller's SSE generator is done —
+    called as the last statement in `stream_chat_events`, once every frame
+    has already been yielded to the client. `pymongo`'s client is
+    synchronous, so the insert itself runs off the event loop via
+    `asyncio.to_thread`; wrapping that in `create_task` rather than awaiting
+    it means the request handler returns immediately and this write never
+    sits on the customer's critical path.
+    """
+    task = asyncio.create_task(asyncio.to_thread(_write_trace_log, thread_id, persona, events))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+
+
 # Nodes whose LLM calls are machinery rather than prose. `intake` uses
 # `with_structured_output`, so streaming it verbatim puts raw extraction JSON in
 # the customer's chat window. Everything else is presentational by default, so
@@ -272,6 +308,11 @@ async def stream_chat_events(
 
     t_prev = time.perf_counter()
     pending_detail: dict = {}
+    trace_events: list[dict] = []
+
+    def emit_trace(data: dict) -> str:
+        trace_events.append(data)
+        return _sse("trace", data)
 
     async for mode, chunk in graph.astream(
         payload, config=config, stream_mode=["updates", "messages", "custom"]
@@ -291,7 +332,7 @@ async def stream_chat_events(
             if "token" in chunk:
                 yield _sse("token", {"text": chunk["token"]})
             elif "step" in chunk:
-                yield _sse("trace", {"status": "step", "ts": time.time(), **chunk})
+                yield emit_trace({"status": "step", "ts": time.time(), **chunk})
             else:
                 pending_detail.update(chunk)
         elif mode == "updates":
@@ -307,18 +348,15 @@ async def stream_chat_events(
                 # waiting for `POST /api/approve`, which is exactly what the
                 # trace panel should show (SDD 06 §5).
                 if node == "__interrupt__":
-                    yield _sse(
-                        "trace",
-                        {"node": "await_approval", "status": "interrupted", "ts": time.time()},
-                    )
+                    yield emit_trace({"node": "await_approval", "status": "interrupted", "ts": time.time()})
                     continue
 
-                yield _sse("trace", {"node": node, "status": "started", "ts": time.time() - ms / 1000})
+                yield emit_trace({"node": node, "status": "started", "ts": time.time() - ms / 1000})
                 event = {"node": node, "status": "finished", "ms": ms}
                 if pending_detail:
                     event["detail"] = pending_detail
                     pending_detail = {}
-                yield _sse("trace", event)
+                yield emit_trace(event)
         elif mode == "messages":
             message_chunk, meta = chunk
             if not _is_customer_facing_token(message_chunk, meta):
@@ -345,6 +383,10 @@ async def stream_chat_events(
         },
     )
     yield _sse("done", {"thread_id": thread_id})
+
+    # Item 10 — persist the same trace the panel just showed, after every SSE
+    # frame for this turn has already reached the client.
+    _persist_trace_log(thread_id, persona, trace_events)
 
 
 @app.post("/api/chat")

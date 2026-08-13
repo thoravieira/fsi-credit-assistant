@@ -1,7 +1,10 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { TraceEvent } from '../lib/api';
 import { chipOf, dotOf, fmtMs, summarizeDetail } from '../lib/archMeta';
+
+const SPEED_STORAGE_KEY = 'fsi-replay-speed';
+const SPEEDS = [0.5, 1] as const;
 
 // `step` (negotiation tool/subagent announcements) is a completed, one-shot
 // event, not a pending one — only `started`/`interrupted` are actually still
@@ -52,7 +55,7 @@ export function TraceLog({
 }: {
   trace: TraceEvent[];
   onOpenRow: (event: TraceEvent, groupLabel: string) => void;
-  onReplay: (label: string, rows: TraceEvent[]) => void;
+  onReplay: (label: string, rows: TraceEvent[], speed: number) => void;
   replayingLabel?: string | null;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
@@ -60,15 +63,40 @@ export function TraceLog({
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [trace.length]);
 
+  // Default 0.5x — a demo replay at real recalculated latency is too fast to
+  // narrate over; slowing it down is the whole point of the control.
+  const [speed, setSpeed] = useState<number>(0.5);
+  useEffect(() => {
+    const saved = Number(localStorage.getItem(SPEED_STORAGE_KEY));
+    if (SPEEDS.includes(saved as (typeof SPEEDS)[number])) setSpeed(saved);
+  }, []);
+  const setSpeedPersisted = (s: number) => {
+    setSpeed(s);
+    localStorage.setItem(SPEED_STORAGE_KEY, String(s));
+  };
+
   const groups = groupByTurn(trace).slice(-5);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-surface">
       <div className="flex flex-none items-baseline justify-between px-[18px] pb-[7px] pt-[11px]">
         <span className="text-[12px] font-extrabold uppercase tracking-[0.05em]">Trace ao vivo</span>
-        <span className="text-[10px] text-charcoal/50">
-          {trace.length ? trace.length + ' eventos · clique num passo para abrir os dados' : ''}
-        </span>
+        <div className="flex items-center gap-2.5">
+          <span className="text-[10px] text-charcoal/50">
+            {trace.length ? trace.length + ' eventos · clique num passo para abrir os dados' : ''}
+          </span>
+          <div className="flex flex-none border border-charcoal/30" title="Velocidade do replay">
+            {SPEEDS.map((s) => (
+              <button
+                key={s}
+                onClick={() => setSpeedPersisted(s)}
+                className={'px-1.5 py-[3px] text-[9.5px] font-bold ' + (speed === s ? 'bg-charcoal text-paper' : 'bg-white text-charcoal/60')}
+              >
+                {s}x
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
       <div ref={listRef} className="flex-1 overflow-auto px-[18px] pb-3.5">
         {trace.length === 0 && (
@@ -81,7 +109,7 @@ export function TraceLog({
             <div key={gi} className="mb-3">
               <div className="mb-[3px] flex items-center gap-2 border-b-2 border-charcoal/40 py-[5px]">
                 <button
-                  onClick={() => onReplay(g.label, g.rows)}
+                  onClick={() => onReplay(g.label, g.rows, speed)}
                   title="Replay no diagrama"
                   className="flex flex-none items-center gap-[5px] border border-forest px-2 py-[3px] text-[10px] font-bold"
                   style={{ background: replaying ? '#00684A' : '#fff', color: replaying ? '#fff' : '#00684A' }}

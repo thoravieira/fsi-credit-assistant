@@ -158,15 +158,15 @@ export function ArchitecturePanel({
                     <button
                       key={id}
                       onClick={() => onOpenNode(id)}
-                      className="absolute left-1.5 right-1.5 flex flex-col items-start gap-0.5 border bg-white px-2 py-1.5 text-left font-sans"
+                      className={'absolute left-1.5 right-1.5 flex flex-col items-start gap-0.5 border bg-white px-2 py-1.5 text-left font-sans' + (on ? ' animate-card-pulse' : '')}
                       style={{
                         top: i * ROW_H + 3,
                         height: ROW_H - 6,
                         borderRadius: 7,
                         borderWidth: on ? 2 : 1,
                         borderColor: on || lit ? l.accent : 'rgba(32,30,29,.18)',
-                        boxShadow: on ? `0 0 0 3px ${l.accent}30` : 'none',
                         opacity: lit || on ? 1 : 0.6,
+                        ['--pulse-color' as string]: `${l.accent}55`,
                       }}
                     >
                       <span className="flex w-full items-center justify-between gap-1">

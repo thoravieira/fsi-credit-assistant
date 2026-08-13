@@ -50,6 +50,7 @@ def test_has_complete_application_all_required_present():
         "asset_value": 400_000.0,
         "down_payment": 100_000.0,
         "term_months": 360,
+        "purpose": "Compra de imóvel residencial",
     }
     assert has_complete_application(_base_state(application=app)) == "complete"
 

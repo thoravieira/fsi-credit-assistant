@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { Decision, OUTCOME_LABELS, POLICY_TEXT } from '../lib/api';
+import { Markdown } from '../lib/markdown';
 
 // Shared by both routes: Mariana sees it standalone after a simulation,
 // Carlos sees it inside the case detail panel. Two producers write `Decision`
@@ -32,7 +33,7 @@ export function DecisionCard({ decision }: { decision: Decision }) {
           </p>
         ))}
         {decision.rationale && !decision.reasons?.length && (
-          <p className="text-[12.5px] leading-relaxed text-ink/72">{decision.rationale}</p>
+          <Markdown text={decision.rationale} className="text-[12.5px] leading-relaxed text-ink/72" />
         )}
         {decision.conditions?.map((c, i) => (
           <p key={'c' + i} className="flex gap-2 text-[12.5px] leading-relaxed text-ink/72">

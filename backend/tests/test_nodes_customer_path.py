@@ -60,7 +60,12 @@ def test_intake_merges_and_marks_complete():
         messages=[HumanMessage("Quero financiar com entrada de 100 mil, prazo de 360 meses")],
     )
     fake_llm = _FakeStructuredLLM(
-        _ExtractedFields(asset_value=400_000.0, down_payment=100_000.0, term_months=360)
+        _ExtractedFields(
+            asset_value=400_000.0,
+            down_payment=100_000.0,
+            term_months=360,
+            purpose="Compra de imóvel residencial",
+        )
     )
 
     result = intake(state, llm=fake_llm)
