@@ -292,6 +292,10 @@ const PRIMARY: Record<string, ChipKey> = {
   policy_researcher: 'vector', precedent_analyst: 'vector', await_approval: 'human',
   persist_decision: 'mongo', api: 'graph',
   contract_acceptance: 'mongo',
+  recalculate_scenario: 'python', solve_for_target_dti: 'python', solve_term_for_target_dti: 'python',
+  check_open_finance_assets: 'deep',
+  audit_log: 'mongo', application_update: 'mongo', precedent_upsert: 'mongo', memory_write: 'mongo',
+  checkpoint_confirmation: 'short', contract_update: 'mongo',
 };
 
 export function summarizeDetail(detail?: Record<string, unknown>): string | null {

@@ -141,7 +141,7 @@ export function TraceLog({
               </div>
               {g.rows.map((row, ri) => {
                 const key = laneCardId(row);
-                const chip = chipOf(key);
+                const chip = chipOf(row.step ?? key);
                 const label = row.status === 'step' ? row.node + ' · ' + row.step : row.node;
                 const detail = summarizeDetail(row.detail) ?? statusFallback(row.status);
                 return (

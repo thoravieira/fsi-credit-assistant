@@ -65,7 +65,7 @@ export function Drawer({ state, onClose }: { state: DrawerState; onClose: () => 
     subtitle = (info?.sub ?? '') + ' · status ' + event.status + (event.ms != null ? ' · ' + fmtMs(event.ms) : '');
     const detailEntries = event.detail ? Object.entries(event.detail) : [];
     what = detailEntries.length ? '' : info?.what ?? event.detail ? '' : 'Este passo ainda não retornou detalhe — aguardando conclusão.';
-    chips = [chipOf(infoId)];
+    chips = [chipOf(event.step ?? infoId)];
     rows = detailEntries.length
       ? [...detailEntries.map(([k, v]) => [k, stringifyDetailValue(v)] as [string, string]), ['latência', latencyLabel(event.ms, event.status)], ['grupo', groupLabel]]
       : info?.rows ?? [['latência', latencyLabel(event.ms, event.status)], ['grupo', groupLabel]];
