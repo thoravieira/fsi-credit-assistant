@@ -89,6 +89,17 @@ export function ArchitecturePanel({
           ? 'ocioso'
           : 'aguardando entrada';
   const statusActive = !!liveActiveId || waiting;
+  const detailKicker = replay
+    ? `Replay · ${laneOfCur.badgeLabel}`
+    : focus
+      ? `Passo selecionado · ${laneOfCur.badgeLabel}`
+      : waiting
+        ? `Ponto de controle · ${laneOfCur.badgeLabel}`
+        : liveActiveId
+          ? `Passo ativo · ${laneOfCur.badgeLabel}`
+          : trace.length
+            ? `Último passo concluído · ${laneOfCur.badgeLabel}`
+            : `Próximo passo · ${laneOfCur.badgeLabel}`;
 
   return (
     <div className="flex flex-none flex-col overflow-hidden border-b-2 border-charcoal/40 px-[18px] pb-2.5 pt-3.5" style={{ height: heightPercent + '%' }}>
@@ -158,15 +169,15 @@ export function ArchitecturePanel({
                     <button
                       key={id}
                       onClick={() => onOpenNode(id)}
-                      className="absolute left-1.5 right-1.5 flex flex-col items-start gap-0.5 border bg-white px-2 py-1.5 text-left font-sans"
+                      className={'absolute left-1.5 right-1.5 flex flex-col items-start gap-0.5 border bg-white px-2 py-1.5 text-left font-sans' + (on ? ' animate-card-pulse' : '')}
                       style={{
                         top: i * ROW_H + 3,
                         height: ROW_H - 6,
                         borderRadius: 7,
                         borderWidth: on ? 2 : 1,
                         borderColor: on || lit ? l.accent : 'rgba(32,30,29,.18)',
-                        boxShadow: on ? `0 0 0 3px ${l.accent}30` : 'none',
                         opacity: lit || on ? 1 : 0.6,
+                        ['--pulse-color' as string]: `${l.accent}55`,
                       }}
                     >
                       <span className="flex w-full items-center justify-between gap-1">
@@ -198,7 +209,7 @@ export function ArchitecturePanel({
 
       <div className="grid flex-none grid-cols-3 gap-2 border-t-2 border-charcoal/40 pt-2">
         <div>
-          <div className="text-[9px] font-extrabold uppercase tracking-[0.05em] text-charcoal/45">Passo ativo · {laneOfCur.badgeLabel}</div>
+          <div className="text-[9px] font-extrabold uppercase tracking-[0.05em] text-charcoal/45">{detailKicker}</div>
           <div className="mt-0.5 truncate text-[12.5px] font-bold">{info.label}</div>
           <div className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-charcoal/60">{info.what}</div>
           <div className="mt-1 font-mono text-[9.5px] text-charcoal/45">{ms}</div>

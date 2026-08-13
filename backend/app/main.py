@@ -7,6 +7,7 @@ so the app module itself, and the five endpoints that don't touch the graph,
 work today.
 """
 
+import asyncio
 import json
 import time
 from contextlib import asynccontextmanager
@@ -16,7 +17,7 @@ from typing import AsyncIterator, Literal
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import AIMessageChunk, HumanMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage
 from langgraph.types import Command
 from pydantic import BaseModel
 
@@ -43,6 +44,10 @@ class ChatRequest(BaseModel):
 class ApproveRequest(BaseModel):
     thread_id: str
     resume: dict
+
+
+class ContractRequest(BaseModel):
+    thread_id: str
 
 
 @asynccontextmanager
@@ -105,7 +110,9 @@ def list_applications(status: str | None = None, customer_id: str | None = None)
         query["status"] = status
     if customer_id:
         query["customer_id"] = customer_id
-    docs = list(get_db()["applications"].find(query).sort("created_at", -1))
+    docs = list(
+        get_db()["applications"].find(query).sort([("updated_at", -1), ("created_at", -1)])
+    )
     return {"applications": docs}
 
 
@@ -115,6 +122,118 @@ def get_application(application_id: str):
     if doc is None:
         raise HTTPException(status_code=404, detail="application not found")
     return doc
+
+
+def _current_decision(row: dict) -> dict | None:
+    """Return only the decision that matches the application's live status."""
+    status = row.get("status")
+    final = row.get("final_decision") or {}
+    assessment = (row.get("latest_assessment") or {}).get("decision") or {}
+    if final.get("outcome") == status:
+        return final
+    if assessment.get("outcome") == status:
+        return assessment
+    return None
+
+
+@app.post("/api/contract")
+async def contract_application(body: ContractRequest, request: Request):
+    """Record customer acceptance without re-running credit assessment.
+
+    Contracting is a business transition after a positive decision, not a new
+    natural-language simulation. Sending it through `/api/chat` used to run
+    the customer graph again, replace the human verdict with `auto_approved`,
+    and make the button reappear after a reload.
+    """
+    db = get_db()
+    row = db["applications"].find_one({"_id": body.thread_id})
+    if row is None:
+        raise HTTPException(status_code=404, detail="application not found")
+
+    decision = _current_decision(row)
+    if not decision or decision.get("outcome") not in {
+        "auto_approved",
+        "approved",
+        "approved_with_conditions",
+    }:
+        raise HTTPException(status_code=409, detail="application has no current approved proposal")
+
+    if row.get("contracted_at"):
+        return {
+            "thread_id": body.thread_id,
+            "contract_status": "contracted",
+            "contracted_at": row["contracted_at"],
+            "trace": [],
+        }
+
+    trace_events: list[dict] = []
+    decorate = _trace_decorator("customer", "contract", "Contratação")
+    started = time.perf_counter()
+    trace_events.append(decorate({"node": "contract_acceptance", "status": "started"}))
+
+    accepted_text = "Aceito contratar esta proposta e seguir com a formalização do financiamento."
+    confirmation_text = (
+        "Aceite registrado. A proposta aprovada segue agora para formalização; "
+        "a análise documental e a assinatura ocorrerão pelos canais oficiais."
+    )
+    config = {"configurable": {"thread_id": body.thread_id}}
+    await request.app.state.graph.aupdate_state(
+        config,
+        {
+            "messages": [
+                HumanMessage(accepted_text, additional_kwargs={"persona": "customer"}),
+                AIMessage(confirmation_text, additional_kwargs={"persona": "customer"}),
+            ]
+        },
+    )
+    trace_events.append(
+        decorate(
+            {
+                "node": "contract_acceptance",
+                "status": "step",
+                "step": "checkpoint_confirmation",
+                "detail": {"store": "checkpoints", "persona": "customer"},
+            }
+        )
+    )
+
+    now = datetime.now(timezone.utc)
+    db["applications"].update_one(
+        {"_id": body.thread_id},
+        {
+            "$set": {
+                "contract_status": "contracted",
+                "contracted_at": now,
+                "updated_at": now,
+            }
+        },
+    )
+    trace_events.append(
+        decorate(
+            {
+                "node": "contract_acceptance",
+                "status": "step",
+                "step": "contract_update",
+                "detail": {"collection": "applications", "contract_status": "contracted"},
+            }
+        )
+    )
+    trace_events.append(
+        decorate(
+            {
+                "node": "contract_acceptance",
+                "status": "finished",
+                "ms": int((time.perf_counter() - started) * 1000),
+            }
+        )
+    )
+    _write_trace_log(body.thread_id, "customer", trace_events, source="contract")
+    return {
+        "thread_id": body.thread_id,
+        "contract_status": "contracted",
+        "contracted_at": now,
+        "trace": trace_events,
+    }
 
 
 def _message_text(message) -> str:
@@ -131,24 +250,34 @@ def _message_text(message) -> str:
 
 
 @app.get("/api/history/{thread_id}")
-async def get_history(thread_id: str, request: Request):
+async def get_history(
+    thread_id: str, request: Request, persona: Literal["customer", "analyst"] | None = None
+):
     """The real conversation for a thread, read back from the LangGraph
     checkpoint — the only durable copy of it. `decisions_log` (`/api/trace`)
     is a structured audit trail of *events*, not the prose turns themselves;
     `applications` carries only the latest snapshot. Only human/AI turns are
-    returned: `AgentState.messages` never carries a bare SystemMessage or a
-    deep-agent tool-call message (`agent/negotiation.py`'s `_map_result` only
-    ever appends the agent's final answer), so no filtering beyond message
-    type is needed to keep this to what the customer or analyst actually saw.
+    returned, and an optional persona filter prevents the customer experience
+    from exposing the analyst's internal negotiation on the shared thread.
     """
     graph = request.app.state.graph
     config = {"configurable": {"thread_id": thread_id}}
     snapshot = await graph.aget_state(config)
     raw_messages = snapshot.values.get("messages") or []
 
+    has_persona_tags = any(
+        (getattr(message, "additional_kwargs", {}) or {}).get("persona")
+        for message in raw_messages
+    )
     messages = []
     for message in raw_messages:
         if message.type not in ("human", "ai"):
+            continue
+        message_persona = (getattr(message, "additional_kwargs", {}) or {}).get("persona")
+        # New checkpoints tag every visible turn. If a legacy checkpoint has
+        # no tags at all, preserve the old all-messages response; once tags
+        # exist, never leak Carlos's internal negotiation into Mariana's app.
+        if persona and has_persona_tags and message_persona != persona:
             continue
         text = _message_text(message)
         if not text:
@@ -167,6 +296,38 @@ def get_trace(thread_id: str):
         get_db()["decisions_log"].find({"thread_id": thread_id}, {"_id": 0}).sort("seq", 1)
     )
     return {"thread_id": thread_id, "events": docs}
+
+
+@app.get("/api/runtime-trace/{thread_id}")
+def get_runtime_trace(
+    thread_id: str,
+    persona: Literal["customer", "analyst"] | None = None,
+    limit_turns: int = 12,
+):
+    """Restore the exact execution traces previously shown in the UI."""
+    limit_turns = min(max(limit_turns, 1), 20)
+    query: dict = {"thread_id": thread_id}
+    if persona:
+        query["persona"] = persona
+    docs = list(
+        get_db()["trace_log"]
+        .find(query, {"_id": 0})
+        .sort("recorded_at", -1)
+        .limit(limit_turns)
+    )
+    docs.reverse()
+
+    events: list[dict] = []
+    for index, doc in enumerate(docs):
+        fallback_id = f"legacy-{thread_id}-{index}"
+        for event_index, raw in enumerate(doc.get("events") or []):
+            event = dict(raw)
+            event.setdefault("turn_id", doc.get("turn_id", fallback_id))
+            event.setdefault("turn_seq", event_index)
+            event.setdefault("turn_label", doc.get("turn_label", "Execução restaurada"))
+            event.setdefault("source", doc.get("source", "chat"))
+            events.append(event)
+    return {"thread_id": thread_id, "events": events}
 
 
 def _index_status(db, collection_name: str) -> dict:
@@ -199,11 +360,76 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, default=str, ensure_ascii=False)}\n\n"
 
 
+# Item 10 — a durable copy of "Trace ao vivo" in its own collection. Kept as a
+# module-level set only so a fire-and-forget `asyncio.create_task` isn't
+# garbage-collected mid-write once `stream_chat_events` returns and its local
+# variables go out of scope (asyncio's own recommendation for tasks nobody
+# awaits — see `asyncio.create_task` docs).
+_background_tasks: set[asyncio.Task] = set()
+
+
+def _write_trace_log(
+    thread_id: str, persona: str, events: list[dict], *, source: str = "chat"
+) -> None:
+    if not events:
+        return
+    first = events[0]
+    get_db()["trace_log"].insert_one(
+        {
+            "thread_id": thread_id,
+            "persona": persona,
+            "source": source,
+            "turn_id": first.get("turn_id"),
+            "turn_label": first.get("turn_label"),
+            "events": events,
+            "recorded_at": datetime.now(timezone.utc),
+        }
+    )
+
+
+def _persist_trace_log(
+    thread_id: str, persona: str, events: list[dict], *, source: str = "chat"
+) -> None:
+    """Schedules the write for *after* the caller's SSE generator is done —
+    called as the last statement in `stream_chat_events`, once every frame
+    has already been yielded to the client. `pymongo`'s client is
+    synchronous, so the insert itself runs off the event loop via
+    `asyncio.to_thread`; wrapping that in `create_task` rather than awaiting
+    it means the request handler returns immediately and this write never
+    sits on the customer's critical path.
+    """
+    task = asyncio.create_task(
+        asyncio.to_thread(_write_trace_log, thread_id, persona, events, source=source)
+    )
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+
+
 # Nodes whose LLM calls are machinery rather than prose. `intake` uses
 # `with_structured_output`, so streaming it verbatim puts raw extraction JSON in
 # the customer's chat window. Everything else is presentational by default, so
 # `analyst_brief` and `negotiation` stream as soon as session 6 adds them.
 _SILENT_LLM_NODES = {"intake"}
+
+
+def _trace_decorator(persona: str, source: str, turn_label: str):
+    turn_id = f"{source}-{time.time_ns()}"
+    sequence = 0
+
+    def decorate(data: dict) -> dict:
+        nonlocal sequence
+        event = {
+            "turn_id": turn_id,
+            "turn_seq": sequence,
+            "turn_label": turn_label,
+            "source": source,
+            "ts": time.time(),
+            **data,
+        }
+        sequence += 1
+        return event
+
+    return decorate
 
 
 def _is_customer_facing_token(message_chunk, meta: dict) -> bool:
@@ -219,7 +445,7 @@ def _is_customer_facing_token(message_chunk, meta: dict) -> bool:
     return meta.get("langgraph_node") not in _SILENT_LLM_NODES
 
 
-def _hydrate_application(thread_id: str, existing: dict | None) -> dict | None:
+def _hydrate_application(row: dict | None, existing: dict | None) -> dict | None:
     """SDD 04 §1 — `thread_id == application_id`.
 
     The graph has no other way to learn which application it is working on:
@@ -227,12 +453,12 @@ def _hydrate_application(thread_id: str, existing: dict | None) -> dict | None:
     while `load_context` needs a `customer_id`. This is where HTTP identity
     becomes graph state.
 
-    Anything already in the checkpoint wins over the stored row, because
+    Negotiable inputs already in the checkpoint win over the stored row, because
     `application` is an overwrite field: re-hydrating it wholesale on every
     turn would discard the patches `intake` made on previous turns and silently
-    undo a re-simulation.
+    undo a re-simulation. Status is the exception: both decision writers commit
+    it to MongoDB, so the stored value is authoritative across later turns.
     """
-    row = get_db()["applications"].find_one({"_id": thread_id})
     if row is None:
         return existing
 
@@ -245,8 +471,63 @@ def _hydrate_application(thread_id: str, existing: dict | None) -> dict | None:
         "requested_amount": row.get("requested_amount"),
         "term_months": row.get("term_months"),
         "purpose": row.get("purpose", ""),
+        # Item 10 — unlike the negotiable inputs above, `status` is never
+        # written into checkpoint state by any node (`persist_decision`
+        # doesn't return it), so it always comes from here: the one place
+        # that can tell the negotiation agent a case it's reopening was
+        # already approved/denied by a human, not still pending.
+        "status": row.get("status"),
     }
-    return {**stored, **(existing or {})}
+    hydrated = {**stored, **(existing or {})}
+    # The database status is committed by both automatic and human decision
+    # paths. A checkpoint can still contain the outcome from before a later
+    # re-simulation, so it must never override that authoritative value.
+    hydrated["status"] = row.get("status")
+    return hydrated
+
+
+def _hydrate_decision_context(
+    row: dict | None, existing_calc: dict | None, existing_decision: dict | None
+) -> tuple[dict | None, dict | None]:
+    """Sibling of `_hydrate_application` for `calc`/`decision`.
+
+    Every case that reached Carlos's queue *used to* have gotten there by
+    running through the live customer-path graph first, which always leaves
+    `calc`/`decision` in the checkpoint before an analyst ever opens it. An
+    application seeded straight into `applications` (Part B of the demo
+    data) skips that entirely — its checkpoint has neither — so
+    `analyst_brief`'s dossier and `negotiation`'s case briefing would open on
+    a blank assessment. A checkpoint still wins only when its decision outcome
+    matches the row's authoritative status; otherwise the matching stored
+    producer replaces the stale state left by a re-simulation.
+    """
+    if row is None:
+        return existing_calc, existing_decision
+
+    latest_assessment = row.get("latest_assessment") or {}
+    latest_calc = latest_assessment.get("calc")
+    latest_decision = latest_assessment.get("decision")
+    final_decision = row.get("final_decision")
+    status = row.get("status")
+
+    # A matching checkpoint is live and can carry a just-recalculated scenario.
+    if existing_decision and existing_decision.get("outcome") == status:
+        if final_decision and final_decision.get("outcome") == status:
+            scenario_calc = (final_decision.get("scenario") or {}).get("calc")
+            return scenario_calc or existing_calc or latest_calc, existing_decision
+        return existing_calc or latest_calc, existing_decision
+
+    # Otherwise select the stored producer whose outcome matches the database
+    # status. This is the re-simulation case: the old human decision remains in
+    # a checkpoint, while latest_assessment is the new manual-review result.
+    if final_decision and final_decision.get("outcome") == status:
+        scenario_calc = (final_decision.get("scenario") or {}).get("calc")
+        return scenario_calc or latest_calc or existing_calc, final_decision
+    if latest_decision and latest_decision.get("outcome") == status:
+        return latest_calc or existing_calc, latest_decision
+
+    # Draft/legacy rows may not have a status-matching producer yet.
+    return existing_calc or latest_calc, existing_decision or final_decision or latest_decision
 
 
 async def stream_chat_events(
@@ -255,23 +536,42 @@ async def stream_chat_events(
     """SDD 11 §2-3 — maps `astream(..., stream_mode=["updates","messages","custom"])`
     onto the four SSE event types.
 
-    `updates` only fires once a node *finishes* (verified by introspection —
-    it carries no separate start signal). `started`/`finished` are therefore
-    both emitted at that point, with `ms` measured as real wall-clock elapsed
-    since the previous node boundary — a true measurement of that node's
-    execution, not an estimate, because this graph's customer path has no
-    parallel branches.
+    Each node emits a custom `started` event on entry; `updates` supplies its
+    completion boundary. The mapper pairs both with a monotonic clock, so a
+    slow model or retrieval visibly remains active while it is really running.
+    A completion-only fallback keeps fake/legacy graphs compatible.
     """
     config = {"configurable": {"thread_id": thread_id}}
-    payload = {"persona": persona, "messages": [HumanMessage(message)]}
+    payload = {
+        "persona": persona,
+        "messages": [HumanMessage(message, additional_kwargs={"persona": persona})],
+    }
 
     snapshot = await graph.aget_state(config)
-    application = _hydrate_application(thread_id, snapshot.values.get("application"))
+    row = get_db()["applications"].find_one({"_id": thread_id})
+    application = _hydrate_application(row, snapshot.values.get("application"))
     if application is not None:
         payload["application"] = application
+    calc, decision = _hydrate_decision_context(row, snapshot.values.get("calc"), snapshot.values.get("decision"))
+    if calc is not None:
+        payload["calc"] = calc
+    if decision is not None:
+        payload["decision"] = decision
 
     t_prev = time.perf_counter()
     pending_detail: dict = {}
+    trace_events: list[dict] = []
+    started_at: dict[str, float] = {}
+    decorate = _trace_decorator(
+        persona,
+        "chat",
+        "Mensagem da cliente" if persona == "customer" else "Interação do analista",
+    )
+
+    def emit_trace(data: dict) -> str:
+        event = decorate(data)
+        trace_events.append(event)
+        return _sse("trace", event)
 
     async for mode, chunk in graph.astream(
         payload, config=config, stream_mode=["updates", "messages", "custom"]
@@ -288,16 +588,22 @@ async def stream_chat_events(
             # like an ordinary `detail` would leave the screen blank for the
             # whole negotiation and then print everything at once, which is the
             # failure mode SDD 06 §6 exists to prevent.
-            if "token" in chunk:
+            if "trace_event" in chunk:
+                event = chunk["trace_event"]
+                if event.get("status") == "started":
+                    started_at[event["node"]] = time.perf_counter()
+                yield emit_trace(event)
+            elif "token" in chunk:
                 yield _sse("token", {"text": chunk["token"]})
             elif "step" in chunk:
-                yield _sse("trace", {"status": "step", "ts": time.time(), **chunk})
+                yield emit_trace({"status": "step", **chunk})
             else:
                 pending_detail.update(chunk)
         elif mode == "updates":
             for node, update in chunk.items():
                 now = time.perf_counter()
-                ms = int((now - t_prev) * 1000)
+                start = started_at.pop(node, None)
+                ms = int((now - (start if start is not None else t_prev)) * 1000)
                 t_prev = now
 
                 # `await_approval` calling `interrupt()` arrives under the
@@ -307,18 +613,16 @@ async def stream_chat_events(
                 # waiting for `POST /api/approve`, which is exactly what the
                 # trace panel should show (SDD 06 §5).
                 if node == "__interrupt__":
-                    yield _sse(
-                        "trace",
-                        {"node": "await_approval", "status": "interrupted", "ts": time.time()},
-                    )
+                    yield emit_trace({"node": "await_approval", "status": "interrupted"})
                     continue
 
-                yield _sse("trace", {"node": node, "status": "started", "ts": time.time() - ms / 1000})
+                if start is None:
+                    yield emit_trace({"node": node, "status": "started"})
                 event = {"node": node, "status": "finished", "ms": ms}
                 if pending_detail:
                     event["detail"] = pending_detail
                     pending_detail = {}
-                yield _sse("trace", event)
+                yield emit_trace(event)
         elif mode == "messages":
             message_chunk, meta = chunk
             if not _is_customer_facing_token(message_chunk, meta):
@@ -346,6 +650,68 @@ async def stream_chat_events(
     )
     yield _sse("done", {"thread_id": thread_id})
 
+    # Item 10 — persist the same trace the panel just showed, after every SSE
+    # frame for this turn has already reached the client.
+    _persist_trace_log(thread_id, persona, trace_events, source="chat")
+
+
+async def stream_approval_events(graph, thread_id: str, resume: dict) -> AsyncIterator[str]:
+    """Resume the human gate and stream persistence milestones as they happen."""
+    config = {"configurable": {"thread_id": thread_id}}
+    trace_events: list[dict] = []
+    pending_detail: dict = {}
+    started_at: dict[str, float] = {}
+    decorate = _trace_decorator("analyst", "approval", "Decisão humana e persistência")
+    t_prev = time.perf_counter()
+
+    def emit_trace(data: dict) -> str:
+        event = decorate(data)
+        trace_events.append(event)
+        return _sse("trace", event)
+
+    async for mode, chunk in graph.astream(
+        Command(resume=resume), config=config, stream_mode=["updates", "custom"]
+    ):
+        if mode == "custom":
+            if "trace_event" in chunk:
+                event = chunk["trace_event"]
+                if event.get("status") == "started":
+                    started_at[event["node"]] = time.perf_counter()
+                yield emit_trace(event)
+            else:
+                pending_detail.update(chunk)
+            continue
+
+        for node, _update in chunk.items():
+            if node == "__interrupt__":
+                yield emit_trace({"node": "await_approval", "status": "interrupted"})
+                continue
+            now = time.perf_counter()
+            start = started_at.pop(node, None)
+            ms = int((now - (start if start is not None else t_prev)) * 1000)
+            t_prev = now
+            if start is None:
+                yield emit_trace({"node": node, "status": "started"})
+            event = {"node": node, "status": "finished", "ms": ms}
+            if pending_detail:
+                event["detail"] = pending_detail
+                pending_detail = {}
+            yield emit_trace(event)
+
+    final_values = (await graph.aget_state(config)).values
+    yield _sse(
+        "state",
+        {
+            "stage": final_values.get("stage"),
+            "calc": final_values.get("calc"),
+            "decision": final_values.get("decision"),
+            "pending_approval": final_values.get("pending_approval"),
+            "scenarios": final_values.get("scenarios"),
+        },
+    )
+    yield _sse("done", {"thread_id": thread_id})
+    _persist_trace_log(thread_id, "analyst", trace_events, source="approval")
+
 
 @app.post("/api/chat")
 async def chat(body: ChatRequest, request: Request):
@@ -359,6 +725,7 @@ async def chat(body: ChatRequest, request: Request):
 @app.post("/api/approve")
 async def approve(body: ApproveRequest, request: Request):
     graph = request.app.state.graph
-    config = {"configurable": {"thread_id": body.thread_id}}
-    result = await graph.ainvoke(Command(resume=body.resume), config=config)
-    return {"stage": result.get("stage"), "decision": result.get("decision")}
+    return StreamingResponse(
+        stream_approval_events(graph, body.thread_id, body.resume),
+        media_type="text/event-stream",
+    )

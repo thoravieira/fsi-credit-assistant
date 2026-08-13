@@ -20,6 +20,14 @@ from app.agent.proposal import build_proposal, cited_policies, detect_verdict
         ("e se a entrada subisse para 168 mil?", None),
         ("qual o LTV nesse caso?", None),
         ("", None),
+        # A question that merely *mentions* approved precedents must not read
+        # as a verdict: "aprovados" contains "aprovado" as a substring, but
+        # is a different word (plural, describing other cases).
+        (
+            "existem casos semelhantes aprovados com comprometimento da renda "
+            "acima de 30%? o que foi sugerido?",
+            None,
+        ),
     ],
 )
 def test_detect_verdict(message, expected):

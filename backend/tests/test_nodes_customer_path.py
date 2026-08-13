@@ -3,6 +3,7 @@
 Per SDD 14 §2: real DB (seeded Day 1 on Atlas), fake LLM.
 """
 
+from datetime import date
 from unittest.mock import patch
 
 import pytest
@@ -10,6 +11,8 @@ from langchain_core.language_models.fake_chat_models import FakeListChatModel
 from langchain_core.messages import HumanMessage
 
 from app.db import get_db
+from app.domain.calculator import max_financeable, max_term_by_age
+from app.domain.rules import POLICIES, age_at_maturity
 from app.graph.nodes.credit_calculator import credit_calculator
 from app.graph.nodes.customer_response import customer_response
 from app.graph.nodes.decision import decision
@@ -60,7 +63,12 @@ def test_intake_merges_and_marks_complete():
         messages=[HumanMessage("Quero financiar com entrada de 100 mil, prazo de 360 meses")],
     )
     fake_llm = _FakeStructuredLLM(
-        _ExtractedFields(asset_value=400_000.0, down_payment=100_000.0, term_months=360)
+        _ExtractedFields(
+            asset_value=400_000.0,
+            down_payment=100_000.0,
+            term_months=360,
+            purpose="Compra de imóvel residencial",
+        )
     )
 
     result = intake(state, llm=fake_llm)
@@ -121,6 +129,126 @@ def test_intake_honours_an_explicitly_stated_financed_amount():
     result = intake(state, llm=fake_llm)
 
     assert result["application"]["requested_amount"] == pytest.approx(250_000.0)
+
+
+def test_intake_flags_solve_financed_max_term_without_requiring_a_stale_term():
+    """"Qual o valor máximo que eu consigo financiar, com o prazo máximo?" must
+    be flagged even though `term_months` is not a fresh fact this turn — the
+    whole point of this intent is that the term is itself unresolved, not
+    reused from whatever the frontend's form default or an earlier turn left
+    behind (the regression this covers: it silently stayed at 48).
+    """
+    prior = {
+        "customer_id": "CUST-0001",
+        "product": "auto",
+        "down_payment": 16_000.0,
+        "term_months": 48,
+        "purpose": "Compra de veículo",
+    }
+    state = _base_state(
+        application=prior,
+        messages=[HumanMessage("qual o valor máximo que eu consigo financiar, com o prazo máximo?")],
+    )
+    fake_llm = _FakeStructuredLLM(_ExtractedFields(intent="solve_financed_max_term"))
+
+    result = intake(state, llm=fake_llm)
+
+    assert result["application"]["_intent"] == "solve_financed_max_term"
+
+
+def test_credit_calculator_solves_financed_for_the_true_max_term():
+    """Regression test for the max-term bug: the stale `term_months: 48` on
+    the application must be replaced by POL-007's age-derived ceiling, not
+    left untouched the way a plain `solve_financed` would.
+    """
+    application = {
+        "product": "auto",
+        "down_payment": 16_000.0,
+        "term_months": 48,
+        "_intent": "solve_financed_max_term",
+    }
+    profile = {
+        "birth_date": "1990-04-17",
+        "credit": {"internal_score": 782, "existing_monthly_debt": 0.0},
+        "income": {"net_monthly": 11_200.0},
+    }
+    state = _base_state(application=application, profile=profile)
+
+    result = credit_calculator(state)
+    solved = result["application"]
+
+    policy = POLICIES["auto"]
+    current_age = age_at_maturity(profile["birth_date"], 0, date.today())
+    expected_term = max_term_by_age(policy.age_at_maturity_limit.value, current_age)
+    expected_financed = max_financeable(
+        product="auto",
+        down_payment=16_000.0,
+        term_months=expected_term,
+        net_income=11_200.0,
+        existing_debt=0.0,
+        score=782,
+        dti_limit=policy.dti_auto_approval_limit.value,
+        ltv_limit=policy.ltv_auto_approval_limit.value,
+        amount_limit=policy.amount_auto_approval_limit.value,
+    )
+
+    assert solved["term_months"] == expected_term
+    assert solved["term_months"] != 48
+    assert solved["requested_amount"] == pytest.approx(expected_financed)
+    assert solved["asset_value"] == pytest.approx(expected_financed + 16_000.0)
+
+
+def test_intake_flags_the_manual_approval_band_explicitly():
+    prior = {
+        "customer_id": "CUST-0001",
+        "product": "mortgage",
+        "down_payment": 100_000.0,
+        "term_months": 360,
+        "purpose": "Compra de imóvel",
+    }
+    state = _base_state(
+        application=prior,
+        messages=[HumanMessage("e sem aprovação automática, qual o valor máximo?")],
+    )
+    fake_llm = _FakeStructuredLLM(_ExtractedFields(intent="solve_financed_manual"))
+
+    result = intake(state, llm=fake_llm)
+
+    assert result["application"]["_intent"] == "solve_financed_manual"
+
+
+def test_credit_calculator_solves_against_manual_not_automatic_limits():
+    application = {
+        "product": "mortgage",
+        "down_payment": 100_000.0,
+        "term_months": 360,
+        "purpose": "Compra de imóvel",
+        "_intent": "solve_financed_manual",
+    }
+    profile = {
+        "birth_date": "1990-04-17",
+        "credit": {"internal_score": 782, "existing_monthly_debt": 1_350.0},
+        "income": {"net_monthly": 11_200.0, "verified": True},
+    }
+
+    result = credit_calculator(_base_state(application=application, profile=profile))
+    solved = result["application"]
+    policy = POLICIES["mortgage"]
+    expected = max_financeable(
+        product="mortgage",
+        down_payment=100_000.0,
+        term_months=360,
+        net_income=11_200.0,
+        existing_debt=1_350.0,
+        score=782,
+        dti_limit=policy.dti_absolute_limit.value,
+        ltv_limit=policy.ltv_absolute_limit.value,
+        amount_limit=policy.amount_manual_approval_limit.value,
+    )
+
+    assert solved["requested_amount"] == pytest.approx(expected)
+    assert solved["requested_amount"] > policy.amount_auto_approval_limit.value
+    assert result["calculation_context"]["approval_band"] == "manual"
 
 
 def test_load_context_reads_seeded_profile():
@@ -309,6 +437,31 @@ def test_decision_updates_the_application_row(application_row):
     assert doc["status"] == "manual_review"
     assert doc["latest_assessment"]["decision"] == result["decision"]
     assert doc["latest_assessment"]["calc"]["ltv"] == pytest.approx(0.75)
+    assert doc["product"] == "mortgage"
+    assert doc["asset_value"] == pytest.approx(400_000.0)
+    assert doc["down_payment"] == pytest.approx(100_000.0)
+    assert doc["requested_amount"] == pytest.approx(300_000.0)
+    assert doc["term_months"] == 360
+
+
+def test_new_assessment_invalidates_a_prior_contract(application_row):
+    get_db()["applications"].update_one(
+        {"_id": application_row},
+        {
+            "$set": {
+                "final_decision": {"outcome": "approved"},
+                "contract_status": "contracted",
+                "contracted_at": "2026-08-13T12:00:00Z",
+            }
+        },
+    )
+
+    _assessed(application_row, asset_value=400_000.0, down_payment=100_000.0)
+
+    doc = get_db()["applications"].find_one({"_id": application_row})
+    assert "final_decision" not in doc
+    assert "contract_status" not in doc
+    assert "contracted_at" not in doc
 
 
 def test_decision_seq_increments_across_resimulations(application_row):

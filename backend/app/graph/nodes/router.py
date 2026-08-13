@@ -5,7 +5,9 @@ to.
 """
 
 from app.graph.state import AgentState
+from app.runtime_trace import trace_started
 
 
 def router(state: AgentState) -> dict:
+    trace_started("router", persona=state.get("persona"))
     return {}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   CalcResult, Decision, PendingApproval, Persona, Scenario, SendChatInput, TraceEvent,
-  streamChat,
+  getRuntimeTrace, streamApproval, streamChat,
 } from '../lib/api';
 
 export interface ChatMessage {
@@ -9,6 +9,11 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   text: string;
   streaming?: boolean;
+  // The decision produced by *this* turn, if any — attached per message so
+  // every proposal keeps its own outcome instead of one global `decision`
+  // being overwritten by the next simulation (SDD 12 follow-up fix).
+  decision?: Decision;
+  contracted?: boolean;
 }
 
 export interface UseAgentStreamResult {
@@ -20,7 +25,10 @@ export interface UseAgentStreamResult {
   scenarios: Scenario[];
   isStreaming: boolean;
   send: (message: string) => Promise<void>;
+  confirmApproval: (resume: Record<string, unknown>) => Promise<Decision | null>;
+  appendTrace: (events: TraceEvent[]) => void;
   hydrate: (data: { messages: ChatMessage[]; decision?: Decision | null }) => void;
+  markContracted: (messageId: string, contracted?: boolean) => void;
 }
 
 /**
@@ -42,25 +50,73 @@ export function useAgentStream(threadId: string, persona: Persona): UseAgentStre
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
 
+  const appendTrace = useCallback((events: TraceEvent[]) => {
+    setTrace((previous) => {
+      const merged = [...previous];
+      const keys = new Set(
+        previous.map((event) =>
+          event.turn_id && event.turn_seq != null
+            ? `${event.turn_id}:${event.turn_seq}`
+            : `${event.source ?? 'legacy'}:${event.node}:${event.status}:${event.step ?? ''}:${event.ts}`
+        )
+      );
+      for (const event of events) {
+        const key = event.turn_id && event.turn_seq != null
+          ? `${event.turn_id}:${event.turn_seq}`
+          : `${event.source ?? 'legacy'}:${event.node}:${event.status}:${event.step ?? ''}:${event.ts}`;
+        if (!keys.has(key)) {
+          keys.add(key);
+          merged.push(event);
+        }
+      }
+      return merged.slice(-300);
+    });
+  }, []);
+
   useEffect(() => {
+    let cancelled = false;
     setTrace([]);
     setMessages([]);
     setCalc(null);
     setDecision(null);
     setPendingApproval(null);
     setScenarios([]);
-  }, [threadId]);
+    getRuntimeTrace(threadId, persona)
+      .then((events) => {
+        if (!cancelled) appendTrace(events);
+      })
+      // A new proposal has no trace yet; the first live turn will populate it.
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [threadId, persona, appendTrace]);
 
   const send = useCallback(
     async (message: string) => {
       setIsStreaming(true);
       setMessages((prev) => [...prev, { id: 'u-' + Date.now(), role: 'user', text: message }]);
       const input: SendChatInput = { threadId, persona, message };
+      // `decision` node runs (and its `state` event fires) before
+      // `customer_response` starts streaming tokens (SDD 05 §1's node order),
+      // so the assistant message this decision belongs to usually doesn't
+      // exist yet when the event arrives — stash it here and attach it the
+      // moment that message is actually created below.
+      let pendingDecision: Decision | undefined;
       try {
         for await (const evt of streamChat(input)) {
           switch (evt.type) {
             case 'trace':
-              setTrace((prev) => [...prev.slice(-59), evt]);
+              appendTrace([evt]);
+              // Fast Python nodes (router, credit_calculator, decision) can
+              // finish in <10ms, so their 'started' + 'finished' pair often
+              // arrives in the same buffered network chunk. Without a yield
+              // here, React 18 batches every setState from this whole
+              // synchronous frame loop into one commit — the browser paints
+              // only the final state and the swimlane highlight never
+              // visibly moves through intermediate steps. Yielding to the
+              // next animation frame forces a real paint per trace event.
+              await new Promise((resolve) => requestAnimationFrame(resolve));
               break;
             case 'token':
               // Pure updater — derives "is there an in-progress assistant
@@ -74,12 +130,23 @@ export function useAgentStream(threadId: string, persona: Persona): UseAgentStre
                 if (last && last.role === 'assistant' && last.streaming) {
                   return prev.map((m, i) => (i === prev.length - 1 ? { ...m, text: m.text + evt.text } : m));
                 }
-                return [...prev, { id: 'a-' + Date.now(), role: 'assistant', text: evt.text, streaming: true }];
+                return [...prev, { id: 'a-' + Date.now(), role: 'assistant', text: evt.text, streaming: true, decision: pendingDecision }];
               });
               break;
             case 'state':
               if (evt.calc) setCalc(evt.calc);
-              if (evt.decision) setDecision(evt.decision);
+              if (evt.decision) {
+                setDecision(evt.decision);
+                pendingDecision = evt.decision;
+                // Covers the reverse ordering too (analyst path can stream
+                // tokens before its own `state` event) — if an assistant
+                // message already exists for this turn, attach directly.
+                setMessages((prev) => {
+                  const last = prev[prev.length - 1];
+                  if (!last || last.role !== 'assistant') return prev;
+                  return prev.map((m, i) => (i === prev.length - 1 ? { ...m, decision: evt.decision ?? undefined } : m));
+                });
+              }
               setPendingApproval(evt.pending_approval ?? null);
               if (evt.scenarios) setScenarios(evt.scenarios);
               break;
@@ -96,7 +163,34 @@ export function useAgentStream(threadId: string, persona: Persona): UseAgentStre
         setIsStreaming(false);
       }
     },
-    [threadId, persona]
+    [threadId, persona, appendTrace]
+  );
+
+  const confirmApproval = useCallback(
+    async (resume: Record<string, unknown>): Promise<Decision | null> => {
+      setIsStreaming(true);
+      let result: Decision | null = null;
+      try {
+        for await (const evt of streamApproval(threadId, resume)) {
+          if (evt.type === 'trace') {
+            appendTrace([evt]);
+            await new Promise((resolve) => requestAnimationFrame(resolve));
+          } else if (evt.type === 'state') {
+            if (evt.calc) setCalc(evt.calc);
+            if (evt.decision) {
+              result = evt.decision;
+              setDecision(evt.decision);
+            }
+            setPendingApproval(evt.pending_approval ?? null);
+            if (evt.scenarios) setScenarios(evt.scenarios);
+          }
+        }
+      } finally {
+        setIsStreaming(false);
+      }
+      return result;
+    },
+    [threadId, appendTrace]
   );
 
   // Seeds this hook's own `messages`/`decision` from data fetched elsewhere —
@@ -105,9 +199,28 @@ export function useAgentStream(threadId: string, persona: Persona): UseAgentStre
   // replayable trace for a past turn) and a `send()` afterwards appends to
   // `messages` exactly as it would after any other turn.
   const hydrate = useCallback((data: { messages: ChatMessage[]; decision?: Decision | null }) => {
-    setMessages(data.messages);
+    let msgs = data.messages;
+    // `GET /api/history` returns plain transcript text, not a decision per
+    // turn — there is no durable per-proposal decision history to restore
+    // after a reload, only whichever one is current right now. Best-effort:
+    // attach it to the last assistant message so the outcome still renders
+    // somewhere sensible instead of nowhere.
+    if (data.decision) {
+      const lastAssistantIdx = msgs.reduce((acc, m, i) => (m.role === 'assistant' ? i : acc), -1);
+      if (lastAssistantIdx >= 0) {
+        msgs = msgs.map((m, i) => (i === lastAssistantIdx ? { ...m, decision: data.decision ?? undefined } : m));
+      }
+    }
+    setMessages(msgs);
     if (data.decision !== undefined) setDecision(data.decision);
   }, []);
 
-  return { trace, messages, calc, decision, pendingApproval, scenarios, isStreaming, send, hydrate };
+  const markContracted = useCallback((messageId: string, contracted = true) => {
+    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, contracted } : m)));
+  }, []);
+
+  return {
+    trace, messages, calc, decision, pendingApproval, scenarios, isStreaming,
+    send, confirmApproval, appendTrace, hydrate, markContracted,
+  };
 }

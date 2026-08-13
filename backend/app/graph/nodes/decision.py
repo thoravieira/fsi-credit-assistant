@@ -11,9 +11,11 @@ from app.audit import append_event
 from app.db import get_db
 from app.domain.rules import evaluate
 from app.graph.state import AgentState
+from app.runtime_trace import trace_started
 
 
 def decision(state: AgentState) -> dict:
+    trace_started("decision")
     application = state["application"]
     calc = state["calc"]
     profile = state.get("profile") or {}
@@ -28,10 +30,24 @@ def decision(state: AgentState) -> dict:
         {"_id": application_id},
         {
             "$set": {
+                "product": application["product"],
+                "asset_value": application["asset_value"],
+                "down_payment": application["down_payment"],
+                "requested_amount": application["requested_amount"],
+                "term_months": application["term_months"],
+                "purpose": application.get("purpose", ""),
                 "status": result["outcome"],
                 "updated_at": now,
                 "latest_assessment": {"calc": calc, "decision": result},
-            }
+            },
+            # A new assessment supersedes both a prior human resolution and
+            # any acceptance of that old proposal. The audit log keeps the
+            # history, while the live row must describe only the new offer.
+            "$unset": {
+                "final_decision": "",
+                "contract_status": "",
+                "contracted_at": "",
+            },
         },
     )
 

@@ -18,6 +18,8 @@ agent's own rationale, framed by figures the calculator produced.
 
 from datetime import datetime, timezone
 
+from langchain_core.messages import AIMessage
+
 from app.audit import append_event
 from app.config import DEMO_ANALYST_ID
 from app.db import get_db
@@ -30,6 +32,7 @@ from app.memory.store import (
     customer_preferences_namespace,
     get_store,
 )
+from app.runtime_trace import trace_started, trace_step
 
 PRODUCT_LABELS = {"mortgage": "financiamento imobiliário", "auto": "financiamento de veículo"}
 OUTCOME_LABELS = {
@@ -47,6 +50,7 @@ def _ltv_band(ltv: float) -> str:
 
 
 def persist_decision(state: AgentState) -> dict:
+    trace_started("persist_decision")
     decision = state.get("decision") or {}
     application = state.get("application") or {}
     profile = state.get("profile") or {}
@@ -54,6 +58,8 @@ def persist_decision(state: AgentState) -> dict:
     scenario = decision.get("scenario") or {}
     calc = scenario.get("calc") or state.get("calc") or {}
     outcome = decision.get("outcome", "denied")
+    final_application = _application_for_scenario(application, scenario)
+    final_application["status"] = outcome
     now = datetime.now(timezone.utc)
 
     append_event(
@@ -68,16 +74,68 @@ def persist_decision(state: AgentState) -> dict:
         conditions=decision.get("conditions", []),
         rationale=decision.get("rationale", ""),
     )
+    trace_step("persist_decision", "audit_log", collection="decisions_log", event_type="final_decision")
 
     get_db()["applications"].update_one(
         {"_id": application_id},
-        {"$set": {"status": outcome, "updated_at": now, "final_decision": decision}},
+        {
+            "$set": {
+                "product": final_application.get("product"),
+                "asset_value": final_application.get("asset_value"),
+                "down_payment": final_application.get("down_payment"),
+                "requested_amount": final_application.get("requested_amount"),
+                "term_months": final_application.get("term_months"),
+                "purpose": final_application.get("purpose", ""),
+                "status": outcome,
+                "updated_at": now,
+                "final_decision": decision,
+            }
+        },
     )
+    trace_step("persist_decision", "application_update", collection="applications", outcome=outcome)
 
-    _write_precedent(application, profile, calc, decision, now)
-    _write_memories(application, profile, calc, decision, now)
+    _write_precedent(final_application, profile, calc, decision, now)
+    trace_step("persist_decision", "precedent_upsert", collection="historical_cases")
+    _write_memories(final_application, profile, calc, decision, now)
+    trace_step("persist_decision", "memory_write", collection="agent_memories", namespaces=3)
 
-    return {"stage": "closed"}
+    notification = (
+        "Sua proposta foi aprovada. Confira abaixo as condições finais e, se estiver de acordo, "
+        "prossiga com a contratação."
+        if outcome in {"approved", "approved_with_conditions"}
+        else "A análise foi concluída e a proposta não foi aprovada. Consulte os motivos abaixo."
+    )
+    return {
+        "stage": "closed",
+        "application": final_application,
+        "messages": [AIMessage(notification, additional_kwargs={"persona": "customer"})],
+    }
+
+
+def _application_for_scenario(application: dict, scenario: dict) -> dict:
+    """Project the approved scenario back onto the live application row.
+
+    A negotiated structure is not merely an attachment to the verdict: it is
+    the structure the bank approved. Persisting the original request next to a
+    final decision calculated from different inputs creates an internally
+    contradictory queue row and a bad precedent.
+    """
+    inputs = scenario.get("inputs") or {}
+    amount = inputs.get("amount")
+    down_payment = inputs.get("down_payment")
+    asset_value = inputs.get("asset_value")
+    if asset_value is None and amount is not None and down_payment is not None:
+        asset_value = amount + down_payment
+
+    return {
+        **application,
+        "asset_value": asset_value if asset_value is not None else application.get("asset_value"),
+        "down_payment": (
+            down_payment if down_payment is not None else application.get("down_payment")
+        ),
+        "requested_amount": amount if amount is not None else application.get("requested_amount"),
+        "term_months": inputs.get("term_months", application.get("term_months")),
+    }
 
 
 def _write_precedent(

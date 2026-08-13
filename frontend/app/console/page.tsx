@@ -9,11 +9,12 @@ import { Drawer, type DrawerState } from '../../components/Drawer';
 import { laneCardId } from '../../lib/archMeta';
 import { DecisionCard } from '../../components/DecisionCard';
 import { ChatThread } from '../../components/ChatThread';
+import { Markdown } from '../../lib/markdown';
 import { ScenarioTable } from '../../components/ScenarioTable';
 import { CaseQueue, toPendingCase } from '../../components/CaseQueue';
 import {
   CUSTOMER_NAMES, CreditApplication, OUTCOME_LABELS, PRODUCT_LABELS,
-  approve, currentDecisionOf, fmtBRL, getApplication, listApplications,
+  currentDecisionOf, fmtBRL, getApplication, listApplications,
 } from '../../lib/api';
 
 // Instruction text sent to the deep agent, not fabricated numbers — the
@@ -27,6 +28,24 @@ const LEVERS = [
   { key: 'open_finance', label: 'Solicitar Open Finance', prompt: 'Consulte os ativos elegíveis via Open Finance da cliente e avalie se servem como fator compensatório para a proposta atual.' },
 ];
 
+// Item 8: which 1-2 levers are actually plausible for *this* decision, not a
+// static row of all three every turn. Read off the same `policy_refs`/
+// `reasons` the decision itself cites (POL-001..003 = LTV, POL-004/005 = DTI)
+// so the suggestion tracks whatever the real decision breached, not a guess.
+function pickLevers(decision: ReturnType<typeof currentDecisionOf> | null): typeof LEVERS {
+  if (!decision || decision.outcome === 'approved' || decision.outcome === 'approved_with_conditions') return [];
+  const refs = decision.policy_refs.join(' ');
+  const text = (decision.reasons ?? []).join(' ').toLowerCase() + ' ' + (decision.rationale ?? '').toLowerCase();
+  const ltvIssue = /pol-00[123]\b/.test(refs) || text.includes('ltv');
+  const dtiIssue = /pol-00[45]\b/.test(refs) || text.includes('comprometimento de renda');
+
+  const picks: string[] = [];
+  if (ltvIssue) picks.push('reduce_amount');
+  if (dtiIssue) picks.push('extend_term', 'open_finance');
+  if (!picks.length) picks.push('reduce_amount', 'open_finance'); // no clear signal yet — the two most broadly useful levers
+  return LEVERS.filter((l) => picks.includes(l.key)).slice(0, 2);
+}
+
 const TAB_LABEL = { pending: 'Pendentes', approved: 'Aprovados', denied: 'Reprovações' } as const;
 
 export default function ConsolePage() {
@@ -35,6 +54,7 @@ export default function ConsolePage() {
   const [applications, setApplications] = useState<CreditApplication[]>([]);
   const [selectedApp, setSelectedApp] = useState<CreditApplication | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [confirmationNotice, setConfirmationNotice] = useState<string | null>(null);
   const [drawer, setDrawer] = useState<DrawerState>(null);
   const [focus, setFocus] = useState<FocusState | null>(null);
   const openedRef = useRef<Set<string>>(new Set());
@@ -58,9 +78,12 @@ export default function ConsolePage() {
   useEffect(() => {
     setFocus(null);
     setDrawer(null);
+    setConfirmationNotice(null);
   }, [selectedId]);
 
-  const { trace, messages, decision, pendingApproval, scenarios, send, isStreaming } = useAgentStream(selectedId ?? '', 'analyst');
+  const {
+    trace, messages, decision, pendingApproval, scenarios, send, confirmApproval, isStreaming,
+  } = useAgentStream(selectedId ?? '', 'analyst');
   const { replay, start: startReplay } = useReplay();
 
   const sendAndReset = (message: string) => {
@@ -72,13 +95,20 @@ export default function ConsolePage() {
   // Carlos's first look at a fresh case: SDD 05 §1 routes an analyst turn on
   // a case still in `review` to `precedent_search` → `analyst_brief`, which
   // is the dossier (recommendation + citations + precedents, SDD 16 §2 beat
-  // 5). Fired once per case per session — a case already in `negotiation`
-  // just gets an ordinary opening turn instead of a second dossier.
+  // 5). Fired once per still-open case per session. Reopening an already
+  // resolved case is read-only: its stored trace and verdict are enough, and
+  // starting another model turn would bury the persistence evidence the
+  // presenter is trying to explain.
   useEffect(() => {
-    if (!selectedId || openedRef.current.has(selectedId)) return;
+    if (
+      !selectedId || !selectedApp || selectedApp.application_id !== selectedId ||
+      openedRef.current.has(selectedId)
+    ) return;
     openedRef.current.add(selectedId);
-    send('Abrir o caso e apresentar o parecer.');
-  }, [selectedId, send]);
+    if (selectedApp.status === 'manual_review') {
+      send('Abrir o caso e apresentar o parecer.');
+    }
+  }, [selectedId, selectedApp, send]);
 
   const pending = useMemo(() => applications.filter((a) => a.status === 'manual_review'), [applications]);
   const approvedList = useMemo(
@@ -94,23 +124,26 @@ export default function ConsolePage() {
   // would show a stale approved decision after the customer re-simulates on
   // the same thread and it comes back denied (found live, see memory).
   const shownDecision = decision ?? (selectedApp ? currentDecisionOf(selectedApp) : null);
-
-  const runLever = (key: string) => {
-    const lever = LEVERS.find((l) => l.key === key);
-    if (lever) sendAndReset(lever.prompt);
-  };
+  // Item 10 — a case already resolved (Aprovados/Reprovações tabs) can't be
+  // decided again; the backend mirrors this (`negotiation.py` never sets
+  // `pending_approval` once `application.status` leaves `manual_review`).
+  const alreadyDecided = !!selectedApp?.status && selectedApp.status !== 'manual_review' && selectedApp.status !== 'auto_approved';
 
   const stateVerdict = (outcome: 'approved' | 'denied') => {
     sendAndReset(outcome === 'approved' ? 'Aprovar a proposta apresentada.' : 'Reprovar a proposta, não seguir com o crédito.');
   };
 
-  const confirmApproval = async () => {
+  const confirmHumanDecision = async () => {
     if (!selectedId || !pendingApproval) return;
     setConfirming(true);
     try {
-      await approve(selectedId, { outcome: pendingApproval.outcome });
-      openedRef.current.delete(selectedId);
-      setSelectedId(null);
+      const recorded = await confirmApproval({ outcome: pendingApproval.outcome });
+      const updated = await getApplication(selectedId);
+      setSelectedApp(updated);
+      setConfirmationNotice(
+        `Decisão registrada: ${OUTCOME_LABELS[recorded?.outcome ?? updated.status ?? ''] ?? recorded?.outcome ?? updated.status}. ` +
+        'O trace mostra a gravação no log, a atualização da proposta, o novo precedente e a memória aprendida.'
+      );
       refreshQueue();
     } finally {
       setConfirming(false);
@@ -157,8 +190,21 @@ export default function ConsolePage() {
               </div>
 
               {shownDecision && <DecisionCard decision={shownDecision} />}
+              {confirmationNotice && (
+                <div className="border border-forest bg-[#E8F7EF] px-3.5 py-3 text-[11.5px] font-semibold leading-relaxed text-forest">
+                  {confirmationNotice}
+                </div>
+              )}
               <ScenarioTable scenarios={scenarios} />
-              {messages.length > 0 && <ChatThread messages={messages} onSend={sendAndReset} disabled={isStreaming} placeholder="Pedir recomendação ou contraproposta…" />}
+              {messages.length > 0 && (
+                <ChatThread
+                  messages={messages}
+                  onSend={sendAndReset}
+                  disabled={isStreaming}
+                  placeholder="Pedir recomendação ou contraproposta…"
+                  suggestions={!pendingApproval && !isStreaming ? pickLevers(shownDecision) : undefined}
+                />
+              )}
 
               <div className="flex flex-col gap-2.5 border border-charcoal/[0.25] bg-white p-3.5">
                 {pendingApproval ? (
@@ -166,23 +212,21 @@ export default function ConsolePage() {
                     <div className="text-[11.5px] font-bold text-charcoal/70">
                       Proposta do agente: <span className="text-forest">{OUTCOME_LABELS[pendingApproval.outcome] ?? pendingApproval.outcome}</span> — aguardando confirmação humana.
                     </div>
-                    <p className="max-h-24 overflow-auto text-[12px] leading-relaxed text-charcoal/70">{pendingApproval.rationale}</p>
-                    <button onClick={confirmApproval} disabled={confirming} className="border-none bg-spring py-3 text-[13px] font-extrabold text-ink disabled:opacity-50">
+                    <Markdown text={pendingApproval.rationale} className="max-h-24 overflow-auto text-[12px] leading-relaxed text-charcoal/70" />
+                    <button onClick={confirmHumanDecision} disabled={confirming} className="border-none bg-spring py-3 text-[13px] font-extrabold text-ink disabled:opacity-50">
                       {confirming ? 'Confirmando…' : 'Confirmar ' + (OUTCOME_LABELS[pendingApproval.outcome] ?? pendingApproval.outcome)}
                     </button>
                   </>
                 ) : (
                   <>
-                    <div className="flex flex-wrap gap-1.5">
-                      {LEVERS.map((l) => (
-                        <button key={l.key} disabled={isStreaming} onClick={() => runLever(l.key)} className="border border-charcoal/30 bg-white px-3 py-1.5 text-[11.5px] font-semibold disabled:opacity-40">
-                          {l.label}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="flex gap-2.5 border-t border-charcoal/[0.18] pt-2.5">
-                      <button onClick={() => stateVerdict('approved')} disabled={isStreaming} className="flex-1 border-none bg-spring py-3 text-left text-[13px] font-extrabold text-ink disabled:opacity-50">Aprovar</button>
-                      <button onClick={() => stateVerdict('denied')} disabled={isStreaming} className="flex-1 border border-charcoal/40 bg-transparent py-3 text-left text-[13px] font-bold text-charcoal disabled:opacity-50">Reprovar</button>
+                    {alreadyDecided && (
+                      <div className="text-[11.5px] font-bold text-charcoal/70">
+                        Decisão já registrada: <span className="text-forest">{OUTCOME_LABELS[selectedApp.status ?? ''] ?? selectedApp.status}</span>. O chat acima pode ser usado para simular cenários e entender a decisão, mas não altera o resultado.
+                      </div>
+                    )}
+                    <div className="flex gap-2.5">
+                      <button onClick={() => stateVerdict('approved')} disabled={isStreaming || alreadyDecided} title={alreadyDecided ? 'Este caso já foi decidido' : undefined} className="flex-1 border-none bg-spring py-3 text-center text-[13px] font-extrabold text-ink disabled:opacity-50">Aprovar</button>
+                      <button onClick={() => stateVerdict('denied')} disabled={isStreaming || alreadyDecided} title={alreadyDecided ? 'Este caso já foi decidido' : undefined} className="flex-1 border border-charcoal/40 bg-transparent py-3 text-center text-[13px] font-bold text-charcoal disabled:opacity-50">Reprovar</button>
                     </div>
                   </>
                 )}
@@ -206,9 +250,9 @@ export default function ConsolePage() {
             setFocus({ nodeId: laneCardId(event), event });
             setDrawer({ kind: 'row', event, groupLabel });
           }}
-          onReplay={(label, rows) => {
+          onReplay={(label, rows, speed) => {
             setFocus(null);
-            startReplay(label, rows);
+            startReplay(label, rows, speed);
           }}
         />
       }

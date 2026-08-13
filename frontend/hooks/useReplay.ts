@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TraceEvent } from '../lib/api';
+import { laneCardId } from '../lib/archMeta';
 
 // Replays a past turn's real trace rows across the architecture diagram —
 // re-highlighting the steps in the order they actually ran, at a fixed pace
@@ -17,15 +18,16 @@ export function useReplay() {
   useEffect(() => clear, [clear]);
 
   const start = useCallback(
-    (label: string, rows: TraceEvent[]) => {
+    (label: string, rows: TraceEvent[], speed = 1) => {
       clear();
       let t = 0;
+      const step = 480 / speed; // speed 0.5x → 960ms/step, 1x → 480ms/step
       rows.forEach((row) => {
-        t += 480;
-        const nodeId = row.step ?? row.node;
+        t += step;
+        const nodeId = laneCardId(row);
         timers.current.push(setTimeout(() => setReplay({ label, nodeId }), t));
       });
-      timers.current.push(setTimeout(() => setReplay(null), t + 500));
+      timers.current.push(setTimeout(() => setReplay(null), t + 500 / speed));
     },
     [clear]
   );

@@ -210,7 +210,14 @@ def test_approval_is_a_graph_pause_and_only_a_human_resume_writes_the_decision(g
     # agent argued and what the human ruled.
     assert result["decision"]["outcome"] == "approved_with_conditions"
     assert result["decision"]["policy_refs"] == ["POL-020", "POL-012"]
-    assert db["applications"].find_one({"_id": THREAD})["status"] == "approved_with_conditions"
+    persisted = db["applications"].find_one({"_id": THREAD})
+    assert persisted["status"] == "approved_with_conditions"
+    assert persisted["asset_value"] == pytest.approx(400_000.0)
+    assert persisted["down_payment"] == pytest.approx(168_000.0)
+    assert persisted["requested_amount"] == pytest.approx(232_000.0)
+    assert persisted["term_months"] == 360
+    assert result["application"]["requested_amount"] == pytest.approx(232_000.0)
+    assert result["application"]["status"] == "approved_with_conditions"
 
     logged = db["decisions_log"].find_one({"application_id": THREAD, "event_type": "final_decision"})
     assert logged["actor"] == {"type": "analyst", "id": DEMO_ANALYST_ID}
@@ -221,6 +228,7 @@ def test_approval_is_a_graph_pause_and_only_a_human_resume_writes_the_decision(g
     assert len(precedent["embedding"]) == 1024
     assert precedent["ltv_band"] == "low"
     assert "Open Finance" in precedent["summary"]
+    assert precedent["structured"]["requested_amount"] == pytest.approx(232_000.0)
 
     # SDD 07 §2 — all three namespaces written, from what actually happened.
     store = get_store()

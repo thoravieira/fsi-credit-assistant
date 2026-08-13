@@ -35,6 +35,18 @@ def test_route_analyst_elsewhere_goes_to_negotiation():
     assert route(_base_state(persona="analyst", stage="negotiation")) == "negotiation"
 
 
+def test_route_analyst_with_no_checkpoint_yet_goes_to_precedent_search():
+    """A thread the graph has never run on before — e.g. an application
+    seeded straight into `applications` (Part B of the demo data) rather
+    than created live through the customer path — has no `stage` in its
+    checkpoint at all. This must not crash, and should present the dossier
+    like any other case Carlos is opening for the first time.
+    """
+    state = _base_state(persona="analyst")
+    del state["stage"]
+    assert route(state) == "precedent_search"
+
+
 def test_has_complete_application_missing_fields():
     state = _base_state(application={"product": "mortgage", "asset_value": None})
     assert has_complete_application(state) == "incomplete"
@@ -50,6 +62,7 @@ def test_has_complete_application_all_required_present():
         "asset_value": 400_000.0,
         "down_payment": 100_000.0,
         "term_months": 360,
+        "purpose": "Compra de imóvel residencial",
     }
     assert has_complete_application(_base_state(application=app)) == "complete"
 

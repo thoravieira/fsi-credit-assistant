@@ -19,9 +19,11 @@ the design.
 from langgraph.types import interrupt
 
 from app.graph.state import AgentState
+from app.runtime_trace import trace_started
 
 
 def await_approval(state: AgentState) -> dict:
+    trace_started("await_approval", gate="human")
     proposal = state["pending_approval"]
     verdict = interrupt(proposal)
 

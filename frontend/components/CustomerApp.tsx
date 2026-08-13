@@ -1,9 +1,36 @@
 'use client';
+import { useEffect, useRef, useState } from 'react';
 import { ChatInputBar, ChatMessages } from './ChatThread';
-import { DecisionCard } from './DecisionCard';
 import type { ChatMessage } from '../hooks/useAgentStream';
-import type { Decision } from '../lib/api';
-import { OUTCOME_LABELS, POLICY_TEXT, fmtBRL0, fmtPct } from '../lib/api';
+import type { Decision, Product } from '../lib/api';
+import { fmtBRL0, fmtPct } from '../lib/api';
+
+// Demo-fixed profile display fields for the popup (item 3). The phone mockup
+// always shows Mariana's own account (CUST-0001, `app/page.tsx`'s
+// CUSTOMER_ID) — there's no customer-facing profile-fetch endpoint (SDD 11),
+// and an account number isn't part of the stored schema at all, so this
+// mirrors the seeded `data/profiles/profiles.json` record as static copy,
+// the same way the header already hardcoded the name and "cliente desde".
+const CUSTOMER_PROFILE = {
+  initials: 'MD',
+  name: 'Mariana Duarte',
+  since: 'Cliente desde 2016',
+  account: '0842 · 118.223-4',
+  cpf: '***.456.789-**',
+  relationship: 'Conta corrente, cartão de crédito, seguro auto',
+};
+
+// Down-payment slider range differs by product (POL-024 mortgage vs. POL-025
+// auto): a 60k-220k mortgage range would leave a R$16.000 default vehicle
+// entrada unreachable by the slider entirely.
+const DOWN_PAYMENT_RANGE: Record<Product, { min: number; max: number; step: number }> = {
+  mortgage: { min: 60000, max: 220000, step: 5000 },
+  auto: { min: 4000, max: 40000, step: 1000 },
+};
+const PRODUCT_TABS: { key: Product; label: string; header: string; assetLabel: string }[] = [
+  { key: 'mortgage', label: 'Imóvel', header: 'Crédito imobiliário', assetLabel: 'Valor do imóvel' },
+  { key: 'auto', label: 'Veículo', header: 'Crédito de veículo', assetLabel: 'Valor do veículo' },
+];
 
 // Content rendered inside the iPhone bezel for Mariana's route (`/`). Toggles
 // between the simulation form and the chat/result view — matches the target
@@ -11,6 +38,10 @@ import { OUTCOME_LABELS, POLICY_TEXT, fmtBRL0, fmtPct } from '../lib/api';
 // decision comes from the real `useAgentStream` state passed in by
 // `app/page.tsx`; nothing here is computed or simulated locally.
 export function CustomerApp({
+  product,
+  setProduct,
+  termOptions,
+  purposeOptions,
   assetValue,
   setAssetValue,
   downPayment,
@@ -31,9 +62,15 @@ export function CustomerApp({
   messages,
   onSend,
   decision,
-  traceExpanded,
-  onToggleTrace,
+  onContract,
+  hasUnreadDecision,
+  onBellClick,
+  highlightMessageId,
 }: {
+  product: Product;
+  setProduct: (p: Product) => void;
+  termOptions: number[];
+  purposeOptions: string[];
   assetValue: number;
   setAssetValue: (v: number) => void;
   downPayment: number;
@@ -54,36 +91,86 @@ export function CustomerApp({
   messages: ChatMessage[];
   onSend: (text: string) => void;
   decision: Decision | null;
-  traceExpanded: boolean;
-  onToggleTrace: () => void;
+  onContract: (m: ChatMessage) => void;
+  // Item 4 — set by `app/page.tsx` from a fresh `GET /api/applications/:id`
+  // compared against a per-thread "last seen decision" marker, so the bell
+  // rings again after a *new* analyst decision, not on every reopen.
+  hasUnreadDecision: boolean;
+  onBellClick: () => void;
+  highlightMessageId: string | null;
 }) {
+  const activeTab = PRODUCT_TABS.find((t) => t.key === product) ?? PRODUCT_TABS[0];
+  const downRange = DOWN_PAYMENT_RANGE[product];
+  const [profileOpen, setProfileOpen] = useState(false);
   // Explicitly loaded via the history icon (real `GET /api/history` +
   // `GET /api/applications`, app/page.tsx's `openHistory`) — this screen
   // never auto-restores anything on its own.
   const chatVisible = !formOpen && (messages.length > 0 || !!decision);
-  const reasons = decision ? decision.reasons ?? (decision.rationale ? [decision.rationale] : []) : [];
+
+  // Opening the history (or any new turn) should land the customer at the
+  // bottom of the transcript, not wherever the scroll happened to be — the
+  // scroll container is the `overflow-auto` div directly below, not the
+  // window, so a plain anchor/`scrollIntoView` on mount isn't enough once
+  // `chatVisible` flips true from a fresh `hydrate()`.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (chatVisible && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [chatVisible, messages.length, decision]);
 
   return (
-    <div className="flex h-full flex-col bg-[#F4F5F6]">
-      <div className="flex flex-none flex-col gap-[13px] bg-ink px-[18px] pb-4 pt-[54px]">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-[34px] w-[34px] flex-none items-center justify-center bg-white/[0.12] text-[12.5px] font-bold text-white">MD</div>
-            <div>
-              <div className="text-[14px] font-semibold leading-[1.25] text-white">Mariana Duarte</div>
-              <div className="text-[11px] text-white/45">Cliente desde 2016</div>
-            </div>
-          </div>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.5)" strokeWidth="1.8" strokeLinecap="round">
+    <div className="relative flex h-full flex-col bg-[#F4F5F6]">
+      <div className="grid flex-none grid-cols-[30px_1fr_28px] items-center gap-2 bg-ink px-[18px] pb-3.5 pt-[54px]">
+        <button
+          onClick={() => setProfileOpen(true)}
+          aria-label="Ver dados do cliente"
+          className="flex h-[30px] w-[30px] flex-none items-center justify-center bg-white/[0.12] text-[11.5px] font-bold text-white"
+        >
+          {CUSTOMER_PROFILE.initials}
+        </button>
+        <span className="text-right text-[10.5px] font-semibold uppercase tracking-[0.08em] text-white/45">{activeTab.header}</span>
+        <button onClick={onBellClick} aria-label="Notificações" className="relative flex h-7 w-7 flex-none items-center justify-center">
+          <svg
+            width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.5)" strokeWidth="1.8" strokeLinecap="round"
+            className={hasUnreadDecision ? 'animate-bell-ring' : undefined}
+          >
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
           </svg>
-        </div>
-        <div>
-          <div className="text-[10.5px] uppercase tracking-[0.08em] text-white/45">Crédito imobiliário</div>
-          <div className="mt-0.5 text-[21px] font-bold text-white">{formOpen ? 'Simular crédito' : 'Sua simulação'}</div>
-        </div>
+          {hasUnreadDecision && <span className="absolute right-1 top-0.5 h-[7px] w-[7px] bg-spring" />}
+        </button>
       </div>
+
+      {profileOpen && (
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center bg-black/45 p-6"
+          onClick={() => setProfileOpen(false)}
+        >
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[290px] border border-[rgba(0,30,43,0.16)] bg-white p-5">
+            <div className="flex items-start justify-between">
+              <div className="flex h-10 w-10 flex-none items-center justify-center bg-ink text-[13px] font-bold text-white">
+                {CUSTOMER_PROFILE.initials}
+              </div>
+              <button onClick={() => setProfileOpen(false)} aria-label="Fechar" className="text-[20px] leading-none text-ink/40">
+                ×
+              </button>
+            </div>
+            <div className="mt-3 text-[15px] font-bold text-ink">{CUSTOMER_PROFILE.name}</div>
+            <div className="mt-3 flex flex-col gap-2 text-[12.5px]">
+              {[
+                ['Cliente desde', CUSTOMER_PROFILE.since.replace('Cliente desde ', '')],
+                ['Conta', CUSTOMER_PROFILE.account],
+                ['CPF', CUSTOMER_PROFILE.cpf],
+                ['Relacionamento', CUSTOMER_PROFILE.relationship],
+              ].map(([label, value]) => (
+                <div key={label} className="flex justify-between gap-3">
+                  <span className="text-ink/45">{label}</span>
+                  <b className="text-right text-ink">{value}</b>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Always visible, on the form and on the chat — the only two ways in
           or out of a case: reopen the simulation form, or pull the real
@@ -118,11 +205,22 @@ export function CustomerApp({
         <div className="flex flex-1 flex-col overflow-auto p-3.5">
           <div className="flex flex-col gap-3.5 border border-[rgba(0,30,43,0.16)] bg-white p-4">
             <div className="flex gap-1.5">
-              <div className="flex-1 border border-ink bg-ink px-1 py-[9px] text-center text-[11.5px] font-bold text-white">Imóvel</div>
+              {PRODUCT_TABS.map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => setProduct(t.key)}
+                  className={
+                    'flex-1 border px-1 py-[9px] text-center text-[11.5px] font-bold ' +
+                    (t.key === product ? 'border-ink bg-ink text-white' : 'border-[rgba(0,30,43,0.16)] bg-white text-ink/60')
+                  }
+                >
+                  {t.label}
+                </button>
+              ))}
             </div>
 
             <label className="flex flex-col gap-1.5 text-[11px] font-semibold text-[rgba(0,30,43,0.5)]">
-              Valor do imóvel
+              {activeTab.assetLabel}
               <div className="flex items-baseline gap-1.5 border-b-2 border-[rgba(0,30,43,0.25)] py-2">
                 <span className="text-[20px] font-bold text-ink">R$</span>
                 <input
@@ -139,7 +237,7 @@ export function CustomerApp({
                 <span className="text-[15px] font-bold text-ink">{fmtBRL0(downPayment)}</span>
               </div>
               <input
-                type="range" min={60000} max={220000} step={5000} value={downPayment}
+                type="range" min={downRange.min} max={downRange.max} step={downRange.step} value={downPayment}
                 onChange={(e) => setDownPayment(Number(e.target.value))}
                 className="w-full accent-forest"
               />
@@ -149,15 +247,13 @@ export function CustomerApp({
               <label className="flex flex-1 flex-col gap-1.5 text-[11px] font-semibold text-[rgba(0,30,43,0.5)]">
                 Prazo
                 <select value={termMonths} onChange={(e) => setTermMonths(Number(e.target.value))} className="border border-[rgba(0,30,43,0.16)] bg-[#FAFBFA] p-2.5 text-[13px] font-semibold text-ink">
-                  {[180, 240, 300, 360, 420].map((m) => <option key={m} value={m}>{m} meses</option>)}
+                  {termOptions.map((m) => <option key={m} value={m}>{m} meses</option>)}
                 </select>
               </label>
               <label className="flex flex-1 flex-col gap-1.5 text-[11px] font-semibold text-[rgba(0,30,43,0.5)]">
                 Finalidade
                 <select value={purpose} onChange={(e) => setPurpose(e.target.value)} className="border border-[rgba(0,30,43,0.16)] bg-[#FAFBFA] p-2.5 text-[13px] font-semibold text-ink">
-                  <option>Compra de imóvel residencial</option>
-                  <option>Reforma do imóvel</option>
-                  <option>Troca de imóvel</option>
+                  {purposeOptions.map((p) => <option key={p}>{p}</option>)}
                 </select>
               </label>
             </div>
@@ -183,67 +279,20 @@ export function CustomerApp({
 
       {chatVisible && (
         <div className="flex min-h-0 flex-1 flex-col">
-          {/* Scrollable transcript: messages, then the result and its business
-              explanation as if they were the assistant's own follow-up
-              "messages" — only the composer and the simulation summary below
-              are pinned outside this scroll region. */}
-          <div className="min-h-0 flex-1 overflow-auto p-3.5">
-            <ChatMessages messages={messages} />
-
-            {decision && (
-              <div className="mt-[11px]">
-                <DecisionCard decision={decision} />
-              </div>
-            )}
-
-            <div className="mt-[11px] overflow-hidden border border-[rgba(0,30,43,0.16)] bg-white">
-              <button onClick={onToggleTrace} className="flex w-full items-center justify-between border-none bg-transparent px-4 py-3.5 text-left">
-                <span className="flex items-center gap-2.5">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#00684A" strokeWidth="2" strokeLinecap="round">
-                    <circle cx="12" cy="12" r="9" /><path d="M12 8v4l3 2" />
-                  </svg>
-                  <span className="text-[12.5px] font-bold text-ink">Como decidimos</span>
-                </span>
-                <span className="text-[10px] text-[rgba(0,30,43,0.4)]">{traceExpanded ? '▲' : '▼'}</span>
-              </button>
-              {traceExpanded && (
-                <div className="flex flex-col gap-3 px-4 pb-4">
-                  {!decision && <div className="text-[11.5px] text-ink/45">Aguardando o resultado desta simulação…</div>}
-                  {decision && (
-                    <>
-                      <div className="text-[12.5px] font-bold text-ink">{OUTCOME_LABELS[decision.outcome] ?? decision.outcome}</div>
-                      <div className="flex flex-col gap-1.5">
-                        {reasons.map((r, i) => (
-                          <p key={i} className="flex gap-2 text-[12.5px] leading-relaxed text-ink/72">
-                            <span className="text-forest">•</span>{r}
-                          </p>
-                        ))}
-                      </div>
-                      {decision.policy_refs.length > 0 && (
-                        <div className="flex flex-col gap-2.5 border-t border-[rgba(0,30,43,0.12)] pt-3">
-                          {decision.policy_refs.map((id) => {
-                            const pol = POLICY_TEXT[id];
-                            if (!pol) return null;
-                            return (
-                              <div key={id} className="text-[11.5px] leading-[1.55] text-ink/70">
-                                <b className="text-ink">{id} · {pol.title}</b>
-                                <p className="mt-1">{pol.body}</p>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
+          {/* Scrollable transcript: messages, and each proposal's outcome
+              (auto_approved/manual_review/denied/approved) directly under the
+              AI message that produced it — `ChatMessages` renders a
+              `DecisionCard` per message that carries a `decision`, so a
+              customer who re-simulates several times keeps every proposal's
+              result in place instead of one card overwritten by the latest. */}
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto p-3.5">
+            <ChatMessages messages={messages} onContract={onContract} highlightMessageId={highlightMessageId} />
           </div>
 
           {/* Pinned footer: the composer is always the last thing on screen —
               reopening the form is the icon in the utility bar above now. */}
           <div className="flex flex-none border-t border-[#E7E9E8] bg-[#F4F5F6] px-3.5 pb-2.5 pt-2">
-            <ChatInputBar onSend={onSend} disabled={isStreaming} placeholder="Escreva para o assistente…" />
+            <ChatInputBar onSend={onSend} disabled={isStreaming} placeholder="Escreva para o assistente…" large />
           </div>
         </div>
       )}

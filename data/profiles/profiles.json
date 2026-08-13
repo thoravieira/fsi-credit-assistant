@@ -108,5 +108,969 @@
       "consent_granted": false,
       "shareable_assets": []
     }
+  },
+  {
+    "_id": "CUST-0004",
+    "name": "Bruno Carvalho Lima",
+    "cpf_masked": "***.234.567-**",
+    "birth_date": "1997-03-12",
+    "employment": {
+      "type": "clt",
+      "employer": "TechNova Sistemas",
+      "tenure_months": 46,
+      "occupation": "Analista de dados sênior"
+    },
+    "income": {
+      "gross_monthly": 9200.0,
+      "net_monthly": 7300.0,
+      "verified": true,
+      "verification_method": "holerite"
+    },
+    "credit": {
+      "internal_score": 560,
+      "bureau_score": 545,
+      "existing_monthly_debt": 2100.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2021-05-10",
+      "tenure_months": 63,
+      "products": ["conta_corrente", "cartao_credito"],
+      "avg_balance_12m": 3200.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": []
+    }
+  },
+  {
+    "_id": "CUST-0005",
+    "name": "Camila Ribeiro Alves",
+    "cpf_masked": "***.345.678-**",
+    "birth_date": "1992-07-05",
+    "employment": {
+      "type": "autonomo",
+      "employer": "Estúdio Camila Alves Design (MEI)",
+      "tenure_months": 80,
+      "occupation": "Designer gráfica autônoma"
+    },
+    "income": {
+      "gross_monthly": 6800.0,
+      "net_monthly": 5400.0,
+      "verified": true,
+      "verification_method": "decore"
+    },
+    "credit": {
+      "internal_score": 575,
+      "bureau_score": 560,
+      "existing_monthly_debt": 900.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2018-09-01",
+      "tenure_months": 95,
+      "products": ["conta_corrente", "cartao_credito"],
+      "avg_balance_12m": 5100.0,
+      "salary_portability": false
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": [
+        { "institution": "Corretora Nortis", "type": "poupanca", "balance": 8200.0, "liquidity": "d_plus_0" }
+      ]
+    }
+  },
+  {
+    "_id": "CUST-0006",
+    "name": "Diego Fernandes Costa",
+    "cpf_masked": "***.456.012-**",
+    "birth_date": "1985-01-22",
+    "employment": {
+      "type": "clt",
+      "employer": "Metalúrgica Vale Forte",
+      "tenure_months": 112,
+      "occupation": "Supervisor de produção"
+    },
+    "income": {
+      "gross_monthly": 7600.0,
+      "net_monthly": 6100.0,
+      "verified": false,
+      "verification_method": "extrato"
+    },
+    "credit": {
+      "internal_score": 590,
+      "bureau_score": 575,
+      "existing_monthly_debt": 1650.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2015-11-20",
+      "tenure_months": 128,
+      "products": ["conta_corrente", "cartao_credito"],
+      "avg_balance_12m": 4100.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": []
+    }
+  },
+  {
+    "_id": "CUST-0007",
+    "name": "Patrícia Gomes Martins",
+    "cpf_masked": "***.567.123-**",
+    "birth_date": "1988-05-30",
+    "employment": {
+      "type": "servidor_publico",
+      "employer": "Prefeitura Municipal de Curitiba",
+      "tenure_months": 132,
+      "occupation": "Professora de ensino fundamental"
+    },
+    "income": {
+      "gross_monthly": 6200.0,
+      "net_monthly": 5100.0,
+      "verified": true,
+      "verification_method": "holerite"
+    },
+    "credit": {
+      "internal_score": 605,
+      "bureau_score": 590,
+      "existing_monthly_debt": 700.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2020-02-14",
+      "tenure_months": 77,
+      "products": ["conta_corrente", "cartao_credito", "previdencia_privada"],
+      "avg_balance_12m": 6300.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": []
+    }
+  },
+  {
+    "_id": "CUST-0008",
+    "name": "Thiago Almeida Rocha",
+    "cpf_masked": "***.678.234-**",
+    "birth_date": "1981-02-14",
+    "employment": {
+      "type": "empresario",
+      "employer": "Rocha & Almeida Comércio Ltda",
+      "tenure_months": 160,
+      "occupation": "Sócio-proprietário"
+    },
+    "income": {
+      "gross_monthly": 22000.0,
+      "net_monthly": 17500.0,
+      "verified": true,
+      "verification_method": "decore"
+    },
+    "credit": {
+      "internal_score": 615,
+      "bureau_score": 600,
+      "existing_monthly_debt": 4200.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2012-06-01",
+      "tenure_months": 170,
+      "products": ["conta_corrente", "cartao_credito", "consorcio"],
+      "avg_balance_12m": 41000.0,
+      "salary_portability": false
+    },
+    "open_finance": {
+      "consent_granted": true,
+      "shareable_assets": [
+        { "institution": "Corretora Meridiano", "type": "cdb", "balance": 62000.0, "liquidity": "d_plus_1" }
+      ]
+    }
+  },
+  {
+    "_id": "CUST-0009",
+    "name": "Juliana Barbosa Pinto",
+    "cpf_masked": "***.789.345-**",
+    "birth_date": "1995-09-18",
+    "employment": {
+      "type": "clt",
+      "employer": "Grupo Hospitalar São Lucas",
+      "tenure_months": 58,
+      "occupation": "Fisioterapeuta"
+    },
+    "income": {
+      "gross_monthly": 5400.0,
+      "net_monthly": 4300.0,
+      "verified": true,
+      "verification_method": "holerite"
+    },
+    "credit": {
+      "internal_score": 630,
+      "bureau_score": 615,
+      "existing_monthly_debt": 380.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2022-08-05",
+      "tenure_months": 48,
+      "products": ["conta_corrente", "cartao_credito"],
+      "avg_balance_12m": 2400.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": []
+    }
+  },
+  {
+    "_id": "CUST-0010",
+    "name": "Marcos Vinícius Teixeira",
+    "cpf_masked": "***.890.456-**",
+    "birth_date": "1974-04-03",
+    "employment": {
+      "type": "clt",
+      "employer": "Indústria Química Rio Verde",
+      "tenure_months": 196,
+      "occupation": "Técnico de segurança do trabalho"
+    },
+    "income": {
+      "gross_monthly": 6100.0,
+      "net_monthly": 4950.0,
+      "verified": false,
+      "verification_method": "extrato"
+    },
+    "credit": {
+      "internal_score": 645,
+      "bureau_score": 630,
+      "existing_monthly_debt": 1100.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2009-03-15",
+      "tenure_months": 208,
+      "products": ["conta_corrente", "cartao_credito", "seguro_vida"],
+      "avg_balance_12m": 9800.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": []
+    }
+  },
+  {
+    "_id": "CUST-0011",
+    "name": "Fernanda Cardoso Dias",
+    "cpf_masked": "***.901.567-**",
+    "birth_date": "1990-06-25",
+    "employment": {
+      "type": "autonomo",
+      "employer": "Consultório Fernanda Dias Odontologia",
+      "tenure_months": 104,
+      "occupation": "Dentista autônoma"
+    },
+    "income": {
+      "gross_monthly": 15800.0,
+      "net_monthly": 12600.0,
+      "verified": true,
+      "verification_method": "decore"
+    },
+    "credit": {
+      "internal_score": 655,
+      "bureau_score": 640,
+      "existing_monthly_debt": 1900.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2019-04-22",
+      "tenure_months": 87,
+      "products": ["conta_corrente", "cartao_credito"],
+      "avg_balance_12m": 22000.0,
+      "salary_portability": false
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": [
+        { "institution": "Banco Alfa Investimentos", "type": "cdb", "balance": 45000.0, "liquidity": "d_plus_1" }
+      ]
+    }
+  },
+  {
+    "_id": "CUST-0012",
+    "name": "Rodrigo Santos Pereira",
+    "cpf_masked": "***.012.678-**",
+    "birth_date": "1986-03-08",
+    "employment": {
+      "type": "clt",
+      "employer": "Construtora Horizonte",
+      "tenure_months": 88,
+      "occupation": "Engenheiro civil"
+    },
+    "income": {
+      "gross_monthly": 13200.0,
+      "net_monthly": 10400.0,
+      "verified": true,
+      "verification_method": "holerite"
+    },
+    "credit": {
+      "internal_score": 665,
+      "bureau_score": 650,
+      "existing_monthly_debt": 2300.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2016-07-09",
+      "tenure_months": 121,
+      "products": ["conta_corrente", "cartao_credito", "previdencia_privada"],
+      "avg_balance_12m": 15600.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": []
+    }
+  },
+  {
+    "_id": "CUST-0013",
+    "name": "Aline Cristina Souza",
+    "cpf_masked": "***.123.789-**",
+    "birth_date": "1993-11-11",
+    "employment": {
+      "type": "clt",
+      "employer": "Rede Supermercados Bom Preço",
+      "tenure_months": 52,
+      "occupation": "Gerente de loja"
+    },
+    "income": {
+      "gross_monthly": 7100.0,
+      "net_monthly": 5700.0,
+      "verified": true,
+      "verification_method": "holerite"
+    },
+    "credit": {
+      "internal_score": 675,
+      "bureau_score": 660,
+      "existing_monthly_debt": 850.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2023-01-30",
+      "tenure_months": 42,
+      "products": ["conta_corrente", "cartao_credito"],
+      "avg_balance_12m": 3900.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": []
+    }
+  },
+  {
+    "_id": "CUST-0014",
+    "name": "Gustavo Henrique Moreira",
+    "cpf_masked": "***.234.890-**",
+    "birth_date": "1979-01-27",
+    "employment": {
+      "type": "servidor_publico",
+      "employer": "Tribunal de Justiça do Estado",
+      "tenure_months": 140,
+      "occupation": "Analista judiciário"
+    },
+    "income": {
+      "gross_monthly": 16800.0,
+      "net_monthly": 13800.0,
+      "verified": true,
+      "verification_method": "holerite"
+    },
+    "credit": {
+      "internal_score": 685,
+      "bureau_score": 670,
+      "existing_monthly_debt": 2600.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2011-10-11",
+      "tenure_months": 178,
+      "products": ["conta_corrente", "cartao_credito", "previdencia_privada"],
+      "avg_balance_12m": 28500.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": []
+    }
+  },
+  {
+    "_id": "CUST-0015",
+    "name": "Larissa Mendes Azevedo",
+    "cpf_masked": "***.345.901-**",
+    "birth_date": "1997-08-02",
+    "employment": {
+      "type": "clt",
+      "employer": "Colégio Santa Cecília",
+      "tenure_months": 40,
+      "occupation": "Coordenadora pedagógica"
+    },
+    "income": {
+      "gross_monthly": 8300.0,
+      "net_monthly": 6600.0,
+      "verified": true,
+      "verification_method": "holerite"
+    },
+    "credit": {
+      "internal_score": 695,
+      "bureau_score": 680,
+      "existing_monthly_debt": 1050.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2021-12-01",
+      "tenure_months": 56,
+      "products": ["conta_corrente", "cartao_credito"],
+      "avg_balance_12m": 7200.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": []
+    }
+  },
+  {
+    "_id": "CUST-0016",
+    "name": "Felipe Augusto Nogueira",
+    "cpf_masked": "***.456.789-**",
+    "birth_date": "1976-05-19",
+    "employment": {
+      "type": "empresario",
+      "employer": "Nogueira Materiais de Construção",
+      "tenure_months": 180,
+      "occupation": "Sócio-diretor"
+    },
+    "income": {
+      "gross_monthly": 28000.0,
+      "net_monthly": 22000.0,
+      "verified": true,
+      "verification_method": "decore"
+    },
+    "credit": {
+      "internal_score": 600,
+      "bureau_score": 585,
+      "existing_monthly_debt": 5400.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2008-05-06",
+      "tenure_months": 219,
+      "products": ["conta_corrente", "cartao_credito", "consorcio"],
+      "avg_balance_12m": 58000.0,
+      "salary_portability": false
+    },
+    "open_finance": {
+      "consent_granted": true,
+      "shareable_assets": [
+        { "institution": "Corretora Meridiano", "type": "tesouro_direto", "balance": 91000.0, "liquidity": "d_plus_1" },
+        { "institution": "Corretora Meridiano", "type": "fundo_multimercado", "balance": 37000.0, "liquidity": "d_plus_30" }
+      ]
+    }
+  },
+  {
+    "_id": "CUST-0017",
+    "name": "Beatriz Correia Lopes",
+    "cpf_masked": "***.567.890-**",
+    "birth_date": "1999-02-09",
+    "employment": {
+      "type": "clt",
+      "employer": "Banco Regional Sul",
+      "tenure_months": 30,
+      "occupation": "Analista de crédito"
+    },
+    "income": {
+      "gross_monthly": 6600.0,
+      "net_monthly": 5300.0,
+      "verified": true,
+      "verification_method": "holerite"
+    },
+    "credit": {
+      "internal_score": 705,
+      "bureau_score": 690,
+      "existing_monthly_debt": 600.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2024-03-18",
+      "tenure_months": 28,
+      "products": ["conta_corrente", "cartao_credito"],
+      "avg_balance_12m": 4400.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": []
+    }
+  },
+  {
+    "_id": "CUST-0018",
+    "name": "Leonardo Batista Cunha",
+    "cpf_masked": "***.678.901-**",
+    "birth_date": "1982-10-16",
+    "employment": {
+      "type": "clt",
+      "employer": "TransLog Transportadora",
+      "tenure_months": 98,
+      "occupation": "Motorista de longa distância"
+    },
+    "income": {
+      "gross_monthly": 4800.0,
+      "net_monthly": 3950.0,
+      "verified": true,
+      "verification_method": "holerite"
+    },
+    "credit": {
+      "internal_score": 715,
+      "bureau_score": 700,
+      "existing_monthly_debt": 520.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2014-09-25",
+      "tenure_months": 142,
+      "products": ["conta_corrente", "cartao_credito"],
+      "avg_balance_12m": 2900.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": []
+    }
+  },
+  {
+    "_id": "CUST-0019",
+    "name": "Renata Oliveira Castro",
+    "cpf_masked": "***.789.012-**",
+    "birth_date": "1962-04-21",
+    "employment": {
+      "type": "aposentado",
+      "employer": "INSS (aposentada)",
+      "tenure_months": 48,
+      "occupation": "Aposentada — ex-professora"
+    },
+    "income": {
+      "gross_monthly": 7200.0,
+      "net_monthly": 6100.0,
+      "verified": true,
+      "verification_method": "holerite"
+    },
+    "credit": {
+      "internal_score": 725,
+      "bureau_score": 710,
+      "existing_monthly_debt": 450.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2010-02-28",
+      "tenure_months": 197,
+      "products": ["conta_corrente", "cartao_credito", "previdencia_privada"],
+      "avg_balance_12m": 19500.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": [
+        { "institution": "Corretora Meridiano", "type": "tesouro_direto", "balance": 34000.0, "liquidity": "d_plus_1" }
+      ]
+    }
+  },
+  {
+    "_id": "CUST-0020",
+    "name": "Eduardo Ferreira Nunes",
+    "cpf_masked": "***.890.123-**",
+    "birth_date": "1989-06-14",
+    "employment": {
+      "type": "clt",
+      "employer": "Refinaria Petro Sul",
+      "tenure_months": 76,
+      "occupation": "Técnico em manutenção industrial"
+    },
+    "income": {
+      "gross_monthly": 8900.0,
+      "net_monthly": 7100.0,
+      "verified": true,
+      "verification_method": "holerite"
+    },
+    "credit": {
+      "internal_score": 735,
+      "bureau_score": 720,
+      "existing_monthly_debt": 1350.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2017-06-13",
+      "tenure_months": 110,
+      "products": ["conta_corrente", "cartao_credito"],
+      "avg_balance_12m": 11200.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": []
+    }
+  },
+  {
+    "_id": "CUST-0021",
+    "name": "Vanessa Lima Rezende",
+    "cpf_masked": "***.901.234-**",
+    "birth_date": "1996-01-30",
+    "employment": {
+      "type": "clt",
+      "employer": "Laboratório Diagnósticos Vida",
+      "tenure_months": 44,
+      "occupation": "Bioquímica"
+    },
+    "income": {
+      "gross_monthly": 10200.0,
+      "net_monthly": 8100.0,
+      "verified": true,
+      "verification_method": "holerite"
+    },
+    "credit": {
+      "internal_score": 745,
+      "bureau_score": 730,
+      "existing_monthly_debt": 980.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2022-11-07",
+      "tenure_months": 45,
+      "products": ["conta_corrente", "cartao_credito"],
+      "avg_balance_12m": 8700.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": []
+    }
+  },
+  {
+    "_id": "CUST-0022",
+    "name": "Alexandre Pires Monteiro",
+    "cpf_masked": "***.012.345-**",
+    "birth_date": "1978-07-08",
+    "employment": {
+      "type": "servidor_publico",
+      "employer": "Secretaria de Fazenda Estadual",
+      "tenure_months": 150,
+      "occupation": "Auditor fiscal"
+    },
+    "income": {
+      "gross_monthly": 24500.0,
+      "net_monthly": 19200.0,
+      "verified": true,
+      "verification_method": "holerite"
+    },
+    "credit": {
+      "internal_score": 755,
+      "bureau_score": 740,
+      "existing_monthly_debt": 3100.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2013-04-16",
+      "tenure_months": 159,
+      "products": ["conta_corrente", "cartao_credito", "previdencia_privada"],
+      "avg_balance_12m": 52000.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": [
+        { "institution": "Corretora Meridiano", "type": "fundo_multimercado", "balance": 68000.0, "liquidity": "d_plus_30" }
+      ]
+    }
+  },
+  {
+    "_id": "CUST-0023",
+    "name": "Débora Santana Ramos",
+    "cpf_masked": "***.123.456-**",
+    "birth_date": "2000-03-17",
+    "employment": {
+      "type": "clt",
+      "employer": "Indústria Têxtil Boa Vista",
+      "tenure_months": 26,
+      "occupation": "Analista de marketing"
+    },
+    "income": {
+      "gross_monthly": 5600.0,
+      "net_monthly": 4500.0,
+      "verified": false,
+      "verification_method": "extrato"
+    },
+    "credit": {
+      "internal_score": 765,
+      "bureau_score": 750,
+      "existing_monthly_debt": 430.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2024-08-01",
+      "tenure_months": 24,
+      "products": ["conta_corrente", "cartao_credito"],
+      "avg_balance_12m": 2100.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": []
+    }
+  },
+  {
+    "_id": "CUST-0024",
+    "name": "Paulo Roberto Andrade",
+    "cpf_masked": "***.234.678-**",
+    "birth_date": "1984-09-24",
+    "employment": {
+      "type": "clt",
+      "employer": "Mineradora Serra Azul",
+      "tenure_months": 118,
+      "occupation": "Engenheiro de minas"
+    },
+    "income": {
+      "gross_monthly": 17500.0,
+      "net_monthly": 13800.0,
+      "verified": true,
+      "verification_method": "holerite"
+    },
+    "credit": {
+      "internal_score": 775,
+      "bureau_score": 760,
+      "existing_monthly_debt": 2200.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2016-01-22",
+      "tenure_months": 126,
+      "products": ["conta_corrente", "cartao_credito", "previdencia_privada"],
+      "avg_balance_12m": 31000.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": []
+    }
+  },
+  {
+    "_id": "CUST-0025",
+    "name": "Isabela Rocha Guimarães",
+    "cpf_masked": "***.345.789-**",
+    "birth_date": "1991-12-05",
+    "employment": {
+      "type": "autonomo",
+      "employer": "Isabela Guimarães Consultoria Financeira",
+      "tenure_months": 90,
+      "occupation": "Consultora financeira autônoma"
+    },
+    "income": {
+      "gross_monthly": 19800.0,
+      "net_monthly": 15600.0,
+      "verified": true,
+      "verification_method": "decore"
+    },
+    "credit": {
+      "internal_score": 785,
+      "bureau_score": 770,
+      "existing_monthly_debt": 2500.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2019-10-09",
+      "tenure_months": 82,
+      "products": ["conta_corrente", "cartao_credito"],
+      "avg_balance_12m": 39000.0,
+      "salary_portability": false
+    },
+    "open_finance": {
+      "consent_granted": true,
+      "shareable_assets": [
+        { "institution": "Corretora Meridiano", "type": "cdb", "balance": 71000.0, "liquidity": "d_plus_1" },
+        { "institution": "Corretora Meridiano", "type": "tesouro_direto", "balance": 26000.0, "liquidity": "d_plus_1" }
+      ]
+    }
+  },
+  {
+    "_id": "CUST-0026",
+    "name": "Vinícius Martins Cavalcanti",
+    "cpf_masked": "***.456.890-**",
+    "birth_date": "1987-04-11",
+    "employment": {
+      "type": "clt",
+      "employer": "Companhia Siderúrgica Nacional Sul",
+      "tenure_months": 106,
+      "occupation": "Engenheiro de produção"
+    },
+    "income": {
+      "gross_monthly": 12400.0,
+      "net_monthly": 9800.0,
+      "verified": true,
+      "verification_method": "holerite"
+    },
+    "credit": {
+      "internal_score": 795,
+      "bureau_score": 780,
+      "existing_monthly_debt": 1750.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2015-05-30",
+      "tenure_months": 134,
+      "products": ["conta_corrente", "cartao_credito", "seguro_auto"],
+      "avg_balance_12m": 17800.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": []
+    }
+  },
+  {
+    "_id": "CUST-0027",
+    "name": "Tatiane Aparecida Silveira",
+    "cpf_masked": "***.567.901-**",
+    "birth_date": "1992-02-19",
+    "employment": {
+      "type": "clt",
+      "employer": "Clínica Médica Vitalis",
+      "tenure_months": 64,
+      "occupation": "Enfermeira"
+    },
+    "income": {
+      "gross_monthly": 6900.0,
+      "net_monthly": 5600.0,
+      "verified": false,
+      "verification_method": "extrato"
+    },
+    "credit": {
+      "internal_score": 805,
+      "bureau_score": 790,
+      "existing_monthly_debt": 610.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2020-07-17",
+      "tenure_months": 72,
+      "products": ["conta_corrente", "cartao_credito"],
+      "avg_balance_12m": 5300.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": []
+    }
+  },
+  {
+    "_id": "CUST-0028",
+    "name": "Ricardo Nunes Barreto",
+    "cpf_masked": "***.678.012-**",
+    "birth_date": "1980-08-28",
+    "employment": {
+      "type": "empresario",
+      "employer": "Barreto Tecnologia Agrícola Ltda",
+      "tenure_months": 140,
+      "occupation": "Sócio-fundador"
+    },
+    "income": {
+      "gross_monthly": 35000.0,
+      "net_monthly": 27500.0,
+      "verified": true,
+      "verification_method": "decore"
+    },
+    "credit": {
+      "internal_score": 815,
+      "bureau_score": 800,
+      "existing_monthly_debt": 6800.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2011-03-03",
+      "tenure_months": 185,
+      "products": ["conta_corrente", "cartao_credito", "consorcio"],
+      "avg_balance_12m": 95000.0,
+      "salary_portability": false
+    },
+    "open_finance": {
+      "consent_granted": true,
+      "shareable_assets": [
+        { "institution": "Corretora Meridiano", "type": "cdb", "balance": 180000.0, "liquidity": "d_plus_1" },
+        { "institution": "Corretora Meridiano", "type": "tesouro_direto", "balance": 62000.0, "liquidity": "d_plus_1" }
+      ]
+    }
+  },
+  {
+    "_id": "CUST-0029",
+    "name": "Simone Cristina Vasconcelos",
+    "cpf_masked": "***.789.123-**",
+    "birth_date": "1959-05-02",
+    "employment": {
+      "type": "aposentado",
+      "employer": "Correios (aposentada)",
+      "tenure_months": 72,
+      "occupation": "Aposentada — ex-carteira"
+    },
+    "income": {
+      "gross_monthly": 3800.0,
+      "net_monthly": 3200.0,
+      "verified": true,
+      "verification_method": "holerite"
+    },
+    "credit": {
+      "internal_score": 825,
+      "bureau_score": 810,
+      "existing_monthly_debt": 280.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2009-12-19",
+      "tenure_months": 199,
+      "products": ["conta_corrente", "cartao_credito"],
+      "avg_balance_12m": 6100.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": []
+    }
+  },
+  {
+    "_id": "CUST-0030",
+    "name": "André Luiz Ferreira Cordeiro",
+    "cpf_masked": "***.890.234-**",
+    "birth_date": "1983-10-30",
+    "employment": {
+      "type": "clt",
+      "employer": "Companhia de Energia Elétrica do Sul",
+      "tenure_months": 124,
+      "occupation": "Engenheiro eletricista"
+    },
+    "income": {
+      "gross_monthly": 15200.0,
+      "net_monthly": 12000.0,
+      "verified": true,
+      "verification_method": "holerite"
+    },
+    "credit": {
+      "internal_score": 830,
+      "bureau_score": 815,
+      "existing_monthly_debt": 1900.0,
+      "delinquency_last_24m": false
+    },
+    "relationship": {
+      "customer_since": "2018-02-25",
+      "tenure_months": 101,
+      "products": ["conta_corrente", "cartao_credito", "previdencia_privada"],
+      "avg_balance_12m": 24000.0,
+      "salary_portability": true
+    },
+    "open_finance": {
+      "consent_granted": false,
+      "shareable_assets": []
+    }
   }
 ]

@@ -15,7 +15,7 @@ import pytest
 from app.domain.rules import (
     POLICIES,
     Threshold,
-    _age_at_maturity,
+    age_at_maturity,
     evaluate,
     product_thresholds,
 )
@@ -181,11 +181,11 @@ def test_age_at_maturity_boundary(product):
     for target, expected in ((limit - 0.05, "auto_approved"), (limit, "auto_approved")):
         birth_date = _birth_date_for_age_at_maturity(target, term_months)
         # Prove the fixture is on the side of the limit the assertion assumes.
-        assert _age_at_maturity(birth_date, term_months, TODAY) <= limit
+        assert age_at_maturity(birth_date, term_months, TODAY) <= limit
         assert _approvable(product, birth_date=birth_date.isoformat()) == expected
 
     over = _birth_date_for_age_at_maturity(limit + 0.05, term_months)
-    assert _age_at_maturity(over, term_months, TODAY) > limit
+    assert age_at_maturity(over, term_months, TODAY) > limit
     assert _approvable(product, birth_date=over.isoformat()) == "denied"
 
 

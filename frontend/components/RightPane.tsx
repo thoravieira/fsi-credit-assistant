@@ -30,7 +30,7 @@ export function RightPane({
   focus: FocusState | null;
   onOpenNode: (id: string) => void;
   onOpenRow: (event: TraceEvent, groupLabel: string) => void;
-  onReplay: (label: string, rows: TraceEvent[]) => void;
+  onReplay: (label: string, rows: TraceEvent[], speed: number) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [splitPercent, setSplitPercent] = useState(SPLIT_DEFAULT);

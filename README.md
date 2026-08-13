@@ -572,6 +572,9 @@ The API image does not bundle the repository-root `data/` directory, so perform 
 ## Demo walkthrough
 
 The seeded profiles and policies are designed for a two-persona demonstration.
+For a rehearsed 7–9 minute narrative with literal prompts, expected figures, audience
+questions, and the customer-to-analyst-to-contract arc, use the
+[`docs/demo-storytelling-pt.md`](docs/demo-storytelling-pt.md) runbook.
 
 ### Customer journey
 
@@ -608,9 +611,11 @@ The right-side frontend panel exposes the runtime trace so an audience can see w
 | `GET` | `/api/applications/{application_id}` | Read the current business-state document |
 | `GET` | `/api/history/{thread_id}` | Read human/assistant conversation turns from the LangGraph checkpoint |
 | `GET` | `/api/trace/{thread_id}` | Read ordered structured events from `decisions_log` |
+| `GET` | `/api/runtime-trace/{thread_id}` | Restore the last runtime trace turns, optionally filtered by persona |
 | `GET` | `/api/health` | Ping Atlas and report vector-index availability |
 | `POST` | `/api/chat` | Stream one customer or analyst turn over SSE |
 | `POST` | `/api/approve` | Resume an interrupted graph with the human verdict |
+| `POST` | `/api/contract` | Record customer acceptance without re-running credit assessment |
 
 ### Create an application
 
@@ -656,12 +661,14 @@ curl -N -X POST http://localhost:8000/api/chat \
 | `state` | Final public state for the turn: stage, calculation, decision, pending approval, and scenarios |
 | `done` | End of the stream for that turn |
 
-The frontend uses `fetch()` plus `ReadableStream`, not `EventSource`, because `/api/chat` is a `POST` request.
+The frontend uses `fetch()` plus `ReadableStream`, not `EventSource`, because `/api/chat` and
+`/api/approve` are `POST` requests. Runtime events carry a durable `turn_id`, sequence, source,
+and label; the latest 12 turns are restored from `trace_log` after a reload or case reopen.
 
 ### Resume human approval
 
 ```bash
-curl -X POST http://localhost:8000/api/approve \
+curl -N -X POST http://localhost:8000/api/approve \
   -H 'Content-Type: application/json' \
   -d '{
     "thread_id": "APP-20260812-0001",
@@ -674,6 +681,11 @@ curl -X POST http://localhost:8000/api/approve \
 ```
 
 The demo does not authenticate this endpoint. A production implementation must derive analyst identity and approval authority from an authenticated session rather than accepting arbitrary client-supplied fields.
+
+Approval is also an SSE stream. It exposes the real `persist_decision` boundary plus the
+audit-log, application-update, precedent-upsert, and memory-write milestones before `state`
+and `done`. Customer acceptance has its own `contract_acceptance` trace so the narrative stays
+explainable after the credit decision.
 
 ## Deterministic credit domain
 
@@ -1029,6 +1041,7 @@ Expand system authority only after evidence, controls, and business metrics just
 ## Further documentation
 
 - [`docs/demo-overview-pt.md`](docs/demo-overview-pt.md) — concise Portuguese business overview
+- [`docs/demo-storytelling-pt.md`](docs/demo-storytelling-pt.md) — rehearsed Portuguese demo narrative with literal prompts and expected outcomes
 - [`docs/specs/00-overview.md`](docs/specs/00-overview.md) — scope and system overview
 - [`docs/specs/01-architecture.md`](docs/specs/01-architecture.md) — architecture decisions
 - [`docs/specs/02-data-model.md`](docs/specs/02-data-model.md) — collections and document shapes

@@ -6,6 +6,21 @@ export interface PendingCase {
   product: string;
   amount: string;
   flag: string;
+  activity: string;
+}
+
+function formatActivity(value?: string): string {
+  if (!value) return 'Data não informada';
+  // MongoDB returns UTC datetimes without a suffix with the default PyMongo
+  // codec. Add it explicitly so browsers do not reinterpret UTC as local.
+  const utcValue = /(Z|[+-]\d{2}:\d{2})$/.test(value) ? value : value + 'Z';
+  const date = new Date(utcValue);
+  if (Number.isNaN(date.getTime())) return 'Data não informada';
+  return new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    timeZone: 'America/Sao_Paulo',
+  }).format(date);
 }
 
 // Real `applications` documents (SDD 11 §1 `GET /api/applications`) mapped to
@@ -20,6 +35,7 @@ export function toPendingCase(doc: CreditApplication): PendingCase {
     product: PRODUCT_LABELS[doc.product] ?? doc.product,
     amount: fmtBRL(doc.asset_value),
     flag: reason ?? 'Fora da faixa de aprovação automática.',
+    activity: formatActivity(doc.updated_at ?? doc.created_at),
   };
 }
 
@@ -34,6 +50,7 @@ export function CaseQueue({ cases, onSelect }: { cases: PendingCase[]; onSelect:
               <span className="text-[13.5px] font-bold">{c.name}</span>
             </div>
             <div className="mt-0.5 text-[11.5px] text-charcoal/50">{c.product} · {c.amount} · {c.id}</div>
+            <div className="mt-0.5 text-[10.5px] font-medium text-charcoal/45">Atualizado em {c.activity}</div>
             <div className="mt-0.5 text-[11.5px] text-charcoal/75">{c.flag}</div>
           </div>
           <span className="flex-none text-charcoal/40">›</span>

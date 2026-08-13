@@ -68,6 +68,7 @@ class ProductPolicy:
     dti_auto_approval_limit: Threshold
     score_auto_approval_floor: Threshold
     amount_auto_approval_limit: Threshold
+    amount_manual_approval_limit: Threshold
     income_verification: Threshold
 
     @property
@@ -108,6 +109,9 @@ POLICIES: dict[Product, ProductPolicy] = {
         amount_auto_approval_limit=Threshold(
             "amount_auto_approval_limit", 300_000, "POL-020", "amount"
         ),
+        amount_manual_approval_limit=Threshold(
+            "amount_manual_approval_limit", 800_000, "POL-020", "amount"
+        ),
         income_verification=Threshold("income_verification", None, "POL-012", "flag"),
     ),
     "auto": ProductPolicy(
@@ -122,6 +126,9 @@ POLICIES: dict[Product, ProductPolicy] = {
         ),
         amount_auto_approval_limit=Threshold(
             "amount_auto_approval_limit", 80_000, "POL-021", "amount"
+        ),
+        amount_manual_approval_limit=Threshold(
+            "amount_manual_approval_limit", 200_000, "POL-021", "amount"
         ),
         income_verification=Threshold("income_verification", None, "POL-013", "flag"),
     ),
@@ -151,7 +158,7 @@ def render_threshold(threshold: Threshold) -> str:
 # --- Fact extraction -------------------------------------------------------
 
 
-def _age_at_maturity(birth_date: Any, term_months: int, today: date) -> float | None:
+def age_at_maturity(birth_date: Any, term_months: int, today: date) -> float | None:
     """`current_age_years + term_months / 12` (SDD 10 §3). Returns `None` when
     the profile carries no usable birth date — the caller treats that as
     "cannot confirm", never as "passes".
@@ -195,7 +202,7 @@ def evaluate(
     amount = float(application["requested_amount"])
     score = credit.get("internal_score")
     income_verified = income.get("verified")
-    age = _age_at_maturity(profile.get("birth_date"), int(application["term_months"]), today)
+    age = age_at_maturity(profile.get("birth_date"), int(application["term_months"]), today)
 
     breaches: list[tuple[Threshold, str]] = []
 

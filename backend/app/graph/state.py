@@ -22,6 +22,7 @@ class CreditApplication(TypedDict):
     requested_amount: float
     term_months: int
     purpose: str
+    status: NotRequired[str]
 
 
 class CalcResult(TypedDict):
@@ -73,3 +74,4 @@ class AgentState(TypedDict):
     decision: Decision | None
     scenarios: Annotated[list[dict], operator.add]
     pending_approval: dict | None
+    calculation_context: NotRequired[dict]

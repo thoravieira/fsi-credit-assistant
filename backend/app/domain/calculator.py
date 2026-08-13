@@ -93,6 +93,186 @@ def cet_annual(
     return (lo + hi) / 2
 
 
+def max_financeable(
+    *,
+    product: Product,
+    down_payment: float,
+    term_months: int,
+    net_income: float,
+    dti_limit: float,
+    ltv_limit: float,
+    amount_limit: float,
+    existing_debt: float = 0.0,
+    score: int = 650,
+    tol: float = 1.0,
+    max_iter: int = 60,
+) -> float:
+    """Largest `financed` for which LTV, DTI and the amount alçada all clear —
+    the inverse of the usual "asset value in, decision out" direction: here
+    the customer gives a down payment and asks for the ceiling, not a
+    specific property (SDD 12 follow-up, item 2 — "simulação inversa").
+
+    Solved by bisection, not algebra, because `annual_rate` is a step
+    function of LTV (SDD 10 §3), which is itself a function of the unknown
+    `financed` — same technique as `cet_annual`, same reason: no closed form
+    once the rate depends on the answer. `down_payment` is a fact about
+    resources on hand, not about a property already chosen, so
+    `asset_value = financed + down_payment` here — financed and down payment
+    always sum to the asset value being implicitly proposed.
+    """
+
+    def _dti_ltv(financed: float) -> tuple[float, float]:
+        asset_value = financed + down_payment
+        ltv_value = ltv(financed, asset_value) if asset_value > 0 else 0.0
+        annual = annual_rate(product, ltv_value, score)
+        monthly_rate = effective_monthly_rate(annual)
+        payment = pmt(financed, monthly_rate, term_months) if financed > 0 else 0.0
+        return dti(payment, net_income, existing_debt), ltv_value
+
+    def _clears(financed: float) -> bool:
+        d, l = _dti_ltv(financed)
+        return d <= dti_limit and l <= ltv_limit
+
+    lo, hi = 0.0, amount_limit
+    if _clears(hi):
+        return hi
+    for _ in range(max_iter):
+        mid = (lo + hi) / 2
+        if _clears(mid):
+            lo = mid
+        else:
+            hi = mid
+        if hi - lo < tol:
+            break
+    return lo
+
+
+def max_financeable_fixed_asset(
+    *,
+    product: Product,
+    asset_value: float,
+    term_months: int,
+    net_income: float,
+    dti_limit: float,
+    ltv_limit: float,
+    amount_limit: float,
+    existing_debt: float = 0.0,
+    score: int = 650,
+    tol: float = 1.0,
+    max_iter: int = 60,
+) -> float:
+    """Largest `financed` for a *fixed* `asset_value` — the sibling inverse of
+    `max_financeable`: "menor entrada para o mesmo valor e prazo" fixes the
+    property and the term and asks for the ceiling on the loan (item 2
+    follow-up). `asset_value` does not move here, unlike `max_financeable`
+    where it's derived from the unknown financed amount — so LTV is a plain
+    ratio against a constant, and only DTI still needs the bisection (the
+    rate band is still a step function of the resulting LTV).
+
+    `down_payment_min = asset_value - max_financeable_fixed_asset(...)`.
+    """
+
+    def _dti_ltv(financed: float) -> tuple[float, float]:
+        ltv_value = ltv(financed, asset_value) if asset_value > 0 else 0.0
+        annual = annual_rate(product, ltv_value, score)
+        monthly_rate = effective_monthly_rate(annual)
+        payment = pmt(financed, monthly_rate, term_months) if financed > 0 else 0.0
+        return dti(payment, net_income, existing_debt), ltv_value
+
+    def _clears(financed: float) -> bool:
+        d, l = _dti_ltv(financed)
+        return d <= dti_limit and l <= ltv_limit
+
+    lo, hi = 0.0, min(amount_limit, asset_value)
+    if _clears(hi):
+        return hi
+    for _ in range(max_iter):
+        mid = (lo + hi) / 2
+        if _clears(mid):
+            lo = mid
+        else:
+            hi = mid
+        if hi - lo < tol:
+            break
+    return lo
+
+
+def max_term_by_age(age_limit: float, current_age_years: float) -> int:
+    """Months remaining until POL-006/007's age-at-maturity ceiling — the only
+    constraint on the maximum term, since DTI never becomes binding again past
+    `term_bounds`'s `min_term` (see its docstring). Split out so a solve that
+    needs the ceiling *before* `financed` is known (there is no amount to
+    plug into `term_bounds` yet) can still get it without a circular call.
+    """
+    return int((age_limit - current_age_years) * 12)
+
+
+def term_bounds(
+    *,
+    product: Product,
+    asset_value: float,
+    financed: float,
+    net_income: float,
+    dti_limit: float,
+    ltv_limit: float,
+    amount_limit: float,
+    age_limit: float,
+    current_age_years: float | None,
+    existing_debt: float = 0.0,
+    score: int = 650,
+    min_search_term: int = 1,
+    max_search_term: int = 600,
+) -> dict:
+    """The feasible term range for a *fixed* asset value and financed amount —
+    "qual o prazo mínimo/máximo" (item 2 follow-up). LTV and the amount
+    alçada don't depend on term at all, so they're checked once: if either
+    already breaks, no term fixes it (`feasible=False`) — this is the
+    "reduza o valor financiado" case shown through the term door instead.
+
+    With LTV fixed, `annual_rate` doesn't change across the search, so
+    `pmt(financed, rate, n)` — and therefore DTI — is strictly decreasing in
+    `n`. That monotonicity is what makes both bounds well-defined:
+    `min_term` is the shortest term whose DTI still clears (a longer term
+    only ever helps DTI, never hurts it), and `max_term` is capped by
+    POL-006/007's age-plus-term limit alone, since DTI never becomes the
+    binding constraint again past `min_term`. No birth date on file means no
+    max term can be confirmed — same "absence of evidence is not evidence of
+    a pass" rule as `domain/rules.py`.
+    """
+    ltv_value = ltv(financed, asset_value) if asset_value > 0 else 0.0
+    if ltv_value > ltv_limit or financed > amount_limit:
+        return {"feasible": False, "reason": "ltv_or_amount", "min_term": None, "max_term": None}
+
+    annual = annual_rate(product, ltv_value, score)
+    monthly_rate = effective_monthly_rate(annual)
+
+    def _dti_at(term_months: int) -> float:
+        payment = pmt(financed, monthly_rate, term_months) if financed > 0 else 0.0
+        return dti(payment, net_income, existing_debt)
+
+    if _dti_at(max_search_term) > dti_limit:
+        return {"feasible": False, "reason": "dti_unreachable", "min_term": None, "max_term": None}
+
+    lo, hi = min_search_term, max_search_term
+    if _dti_at(lo) <= dti_limit:
+        min_term = lo
+    else:
+        while hi - lo > 1:
+            mid = (lo + hi) // 2
+            if _dti_at(mid) <= dti_limit:
+                hi = mid
+            else:
+                lo = mid
+        min_term = hi
+
+    if current_age_years is None:
+        return {"feasible": False, "reason": "birth_date_missing", "min_term": min_term, "max_term": None}
+    max_term = max_term_by_age(age_limit, current_age_years)
+    if max_term < min_term:
+        return {"feasible": False, "reason": "age_conflicts_with_dti", "min_term": min_term, "max_term": max_term}
+    return {"feasible": True, "reason": None, "min_term": min_term, "max_term": max_term}
+
+
 def schedule_preview(pv: float, monthly_rate: float, n: int) -> list[dict]:
     """First 2 and last 1 amortisation rows of the Tabela Price schedule."""
     payment = pmt(pv, monthly_rate, n)

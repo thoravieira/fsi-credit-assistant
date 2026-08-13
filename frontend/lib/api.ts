@@ -38,12 +38,16 @@ export interface ScenarioResumo {
 }
 
 export interface Scenario {
-  inputs: { amount: number; down_payment: number; term_months: number; annual_rate: number };
+  inputs: { asset_value?: number; amount: number; down_payment: number; term_months: number; annual_rate: number };
   calc: CalcResult;
   resumo: ScenarioResumo;
   outcome: Outcome;
   policy_refs: string[];
   reasons: string[];
+  feasible?: boolean;
+  target_dti?: number;
+  constraint?: string;
+  infeasible_reason?: string | null;
 }
 
 // Two producers, one shape (SDD 04 §2): the customer path's `domain/rules.py`
@@ -85,6 +89,10 @@ export interface CreditApplication {
   status?: string;
   latest_assessment?: { calc: CalcResult; decision: Decision } | null;
   final_decision?: Decision | null;
+  contract_status?: 'contracted';
+  contracted_at?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface TraceEvent {
@@ -92,6 +100,10 @@ export interface TraceEvent {
   node: string;
   status: 'started' | 'finished' | 'step' | 'interrupted';
   ts: number;
+  turn_id?: string;
+  turn_seq?: number;
+  turn_label?: string;
+  source?: 'chat' | 'approval' | 'contract';
   ms?: number;
   step?: string;
   detail?: Record<string, unknown>;
@@ -121,14 +133,8 @@ export interface SendChatInput {
 // ---------------------------------------------------------------------------
 const BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 
-export async function* streamChat(input: SendChatInput): AsyncGenerator<ChatStreamEvent> {
-  const res = await fetch(`${BASE_URL}/api/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ thread_id: input.threadId, persona: input.persona, message: input.message }),
-  });
-  if (!res.ok || !res.body) throw new Error(`/api/chat failed: ${res.status}`);
-
+async function* parseSse(res: Response, endpoint: string): AsyncGenerator<ChatStreamEvent> {
+  if (!res.ok || !res.body) throw new Error(`${endpoint} failed: ${res.status}`);
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -148,6 +154,27 @@ export async function* streamChat(input: SendChatInput): AsyncGenerator<ChatStre
       yield { type, ...data } as ChatStreamEvent;
     }
   }
+}
+
+export async function* streamChat(input: SendChatInput): AsyncGenerator<ChatStreamEvent> {
+  const res = await fetch(`${BASE_URL}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ thread_id: input.threadId, persona: input.persona, message: input.message }),
+  });
+  yield* parseSse(res, '/api/chat');
+}
+
+export async function* streamApproval(
+  threadId: string,
+  resume: Record<string, unknown>
+): AsyncGenerator<ChatStreamEvent> {
+  const res = await fetch(`${BASE_URL}/api/approve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ thread_id: threadId, resume }),
+  });
+  yield* parseSse(res, '/api/approve');
 }
 
 export interface CreateApplicationInput {
@@ -182,8 +209,8 @@ export async function listApplications(filter?: { status?: string; customerId?: 
   const res = await fetch(`${BASE_URL}/api/applications${qs ? '?' + qs : ''}`);
   if (!res.ok) throw new Error(`/api/applications failed: ${res.status}`);
   const body = await res.json();
-  // Server sorts by `created_at` desc — callers that want "the customer's
-  // current case" can just take index 0.
+  // Server sorts by latest activity (`updated_at`) so customer and analyst
+  // views both open the case that was actually touched most recently.
   return ((body.applications ?? []) as Record<string, any>[]).map(normalizeApplication);
 }
 
@@ -203,11 +230,37 @@ export interface HistoryMessage {
 // `final_decision` only ever hold the *last* snapshot of each producer, so a
 // case that has been both auto-assessed and analyst-approved, then
 // re-simulated, needs its own current-vs-stale check — see `currentDecisionOf`.
-export async function getHistory(threadId: string): Promise<HistoryMessage[]> {
-  const res = await fetch(`${BASE_URL}/api/history/${encodeURIComponent(threadId)}`);
+export async function getHistory(threadId: string, persona?: Persona): Promise<HistoryMessage[]> {
+  const params = new URLSearchParams();
+  if (persona) params.set('persona', persona);
+  const qs = params.toString();
+  const res = await fetch(`${BASE_URL}/api/history/${encodeURIComponent(threadId)}${qs ? '?' + qs : ''}`);
   if (!res.ok) throw new Error(`/api/history/${threadId} failed: ${res.status}`);
   const body = await res.json();
   return (body.messages ?? []) as HistoryMessage[];
+}
+
+export async function getRuntimeTrace(threadId: string, persona: Persona): Promise<TraceEvent[]> {
+  const params = new URLSearchParams({ persona, limit_turns: '12' });
+  const res = await fetch(`${BASE_URL}/api/runtime-trace/${encodeURIComponent(threadId)}?${params}`);
+  if (!res.ok) throw new Error(`/api/runtime-trace/${threadId} failed: ${res.status}`);
+  const body = await res.json();
+  return (body.events ?? []).map((event: Omit<TraceEvent, 'type'>) => ({ type: 'trace', ...event }));
+}
+
+export async function contractApplication(threadId: string): Promise<{
+  thread_id: string;
+  contract_status: 'contracted';
+  contracted_at: string;
+  trace: TraceEvent[];
+}> {
+  const res = await fetch(`${BASE_URL}/api/contract`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ thread_id: threadId }),
+  });
+  if (!res.ok) throw new Error(`/api/contract failed: ${res.status}`);
+  return res.json();
 }
 
 // `applications.status` is the one field both producers (the automatic
@@ -222,19 +275,6 @@ export function currentDecisionOf(app: CreditApplication): Decision | null {
   if (app.final_decision?.outcome === app.status) return app.final_decision;
   if (app.latest_assessment?.decision?.outcome === app.status) return app.latest_assessment.decision;
   return app.final_decision ?? app.latest_assessment?.decision ?? null;
-}
-
-export async function approve(
-  threadId: string,
-  resume: Record<string, unknown>
-): Promise<{ stage: string; decision: Decision }> {
-  const res = await fetch(`${BASE_URL}/api/approve`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ thread_id: threadId, resume }),
-  });
-  if (!res.ok) throw new Error(`/api/approve failed: ${res.status}`);
-  return res.json();
 }
 
 export interface HealthResponse {
@@ -280,6 +320,33 @@ export const CUSTOMER_NAMES: Record<string, string> = {
   'CUST-0001': 'Mariana Duarte',
   'CUST-0002': 'Rafael Nascimento Souza',
   'CUST-0003': 'Eliane Cristina Ferreira',
+  'CUST-0004': 'Bruno Carvalho Lima',
+  'CUST-0005': 'Camila Ribeiro Alves',
+  'CUST-0006': 'Diego Fernandes Costa',
+  'CUST-0007': 'Patrícia Gomes Martins',
+  'CUST-0008': 'Thiago Almeida Rocha',
+  'CUST-0009': 'Juliana Barbosa Pinto',
+  'CUST-0010': 'Marcos Vinícius Teixeira',
+  'CUST-0011': 'Fernanda Cardoso Dias',
+  'CUST-0012': 'Rodrigo Santos Pereira',
+  'CUST-0013': 'Aline Cristina Souza',
+  'CUST-0014': 'Gustavo Henrique Moreira',
+  'CUST-0015': 'Larissa Mendes Azevedo',
+  'CUST-0016': 'Felipe Augusto Nogueira',
+  'CUST-0017': 'Beatriz Correia Lopes',
+  'CUST-0018': 'Leonardo Batista Cunha',
+  'CUST-0019': 'Renata Oliveira Castro',
+  'CUST-0020': 'Eduardo Ferreira Nunes',
+  'CUST-0021': 'Vanessa Lima Rezende',
+  'CUST-0022': 'Alexandre Pires Monteiro',
+  'CUST-0023': 'Débora Santana Ramos',
+  'CUST-0024': 'Paulo Roberto Andrade',
+  'CUST-0025': 'Isabela Rocha Guimarães',
+  'CUST-0026': 'Vinícius Martins Cavalcanti',
+  'CUST-0027': 'Tatiane Aparecida Silveira',
+  'CUST-0028': 'Ricardo Nunes Barreto',
+  'CUST-0029': 'Simone Cristina Vasconcelos',
+  'CUST-0030': 'André Luiz Ferreira Cordeiro',
 };
 
 export const PRODUCT_LABELS: Record<string, string> = {

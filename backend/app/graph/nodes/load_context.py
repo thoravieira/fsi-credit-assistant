@@ -8,9 +8,11 @@ from langgraph.config import get_stream_writer
 from app.db import get_db
 from app.graph.state import AgentState
 from app.memory.store import customer_facts_namespace, customer_preferences_namespace, get_store
+from app.runtime_trace import trace_started
 
 
 def load_context(state: AgentState) -> dict:
+    trace_started("load_context")
     application = state.get("application") or {}
     customer_id = application.get("customer_id")
 

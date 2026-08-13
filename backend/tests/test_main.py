@@ -7,17 +7,121 @@ manager on purpose: that runs `lifespan`, which compiles the real graph.
 """
 
 import json
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
 from langchain_core.language_models.fake_chat_models import FakeListChatModel
+from langchain_core.messages import AIMessage, HumanMessage
 
 from app.db import get_db
 from app.graph.nodes.intake import _ExtractedFields
-from app.main import app
+from app.main import _hydrate_application, _hydrate_decision_context, app
 
 client = TestClient(app)
+
+
+# --- hydration helpers (pure, no I/O) ---------------------------------------
+# SDD 04 §1 / item 10 — an application seeded straight into `applications`
+# (Part B of the demo data) has never run through the graph, so its
+# checkpoint has neither `application` patches nor `calc`/`decision` yet.
+# These must fall back to the stored row without ever clobbering a live
+# checkpoint's own state — the exact bug this covers crashed `/api/chat` for
+# every one of the 50 seeded applications the first time an analyst opened one
+# (`route()` did `state["stage"]` on a checkpoint that had no `stage` key at
+# all — see `test_routing.py`).
+
+
+def test_hydrate_application_keeps_checkpoint_inputs_but_database_status_wins():
+    row = {
+        "_id": "APP-X", "customer_id": "CUST-X", "product": "mortgage",
+        "asset_value": 400_000.0, "down_payment": 100_000.0, "requested_amount": 300_000.0,
+        "term_months": 360, "purpose": "compra", "status": "manual_review",
+    }
+    existing = {
+        "down_payment": 150_000.0,
+        "status": "approved_with_conditions",
+    }  # a patch plus a stale decision from a prior checkpoint
+
+    result = _hydrate_application(row, existing)
+
+    assert result["down_payment"] == 150_000.0
+    assert result["status"] == "manual_review"
+
+
+def test_hydrate_application_returns_existing_untouched_when_the_row_is_missing():
+    assert _hydrate_application(None, {"foo": "bar"}) == {"foo": "bar"}
+
+
+def test_hydrate_decision_context_falls_back_to_the_stored_assessment_when_the_checkpoint_is_empty():
+    row = {"latest_assessment": {"calc": {"ltv": 0.7}, "decision": {"outcome": "manual_review"}}}
+
+    calc, decision = _hydrate_decision_context(row, None, None)
+
+    assert calc == {"ltv": 0.7}
+    assert decision == {"outcome": "manual_review"}
+
+
+def test_hydrate_decision_context_prefers_the_final_decision_over_the_original_assessment():
+    row = {
+        "latest_assessment": {"calc": {"ltv": 0.7}, "decision": {"outcome": "manual_review"}},
+        "final_decision": {"outcome": "approved_with_conditions"},
+    }
+
+    _calc, decision = _hydrate_decision_context(row, None, None)
+
+    assert decision == {"outcome": "approved_with_conditions"}
+
+
+def test_hydrate_decision_context_never_overwrites_a_matching_live_checkpoint():
+    row = {
+        "status": "manual_review",
+        "latest_assessment": {"calc": {"ltv": 0.99}, "decision": {"outcome": "denied"}},
+    }
+
+    calc, decision = _hydrate_decision_context(row, {"ltv": 0.5}, {"outcome": "manual_review"})
+
+    assert calc == {"ltv": 0.5}
+    assert decision == {"outcome": "manual_review"}
+
+
+def test_hydrate_decision_context_replaces_a_stale_human_decision_after_resimulation():
+    row = {
+        "status": "manual_review",
+        "latest_assessment": {"calc": {"ltv": 0.75}, "decision": {"outcome": "manual_review"}},
+        "final_decision": {"outcome": "approved_with_conditions"},
+    }
+
+    calc, decision = _hydrate_decision_context(
+        row,
+        {"ltv": 0.58},
+        {"outcome": "approved_with_conditions"},
+    )
+
+    assert calc == {"ltv": 0.75}
+    assert decision == {"outcome": "manual_review"}
+
+
+def test_hydrate_decision_context_uses_the_final_scenario_calc_after_approval():
+    final = {
+        "outcome": "approved",
+        "scenario": {"calc": {"ltv": 0.69, "dti": 0.30}},
+    }
+    row = {
+        "status": "approved",
+        "latest_assessment": {"calc": {"ltv": 0.78, "dti": 0.40}},
+        "final_decision": final,
+    }
+
+    calc, decision = _hydrate_decision_context(
+        row,
+        {"ltv": 0.78, "dti": 0.40},
+        final,
+    )
+
+    assert calc == {"ltv": 0.69, "dti": 0.30}
+    assert decision == final
 
 
 @pytest.fixture
@@ -127,7 +231,7 @@ def chat_thread():
     db = get_db()
     db["applications"].delete_one({"_id": application_id})
     db["decisions_log"].delete_many({"application_id": application_id})
-    for collection in ("checkpoints", "checkpoint_writes"):
+    for collection in ("checkpoints", "checkpoint_writes", "trace_log"):
         db[collection].delete_many({"thread_id": application_id})
 
 
@@ -267,6 +371,119 @@ def test_chat_hydrates_the_application_from_the_thread_id(chat_thread):
     assert doc["latest_assessment"]["decision"]["outcome"] == "manual_review"
 
 
+def test_contract_keeps_the_human_verdict_and_filters_customer_history(chat_thread):
+    _chat(chat_thread, "Simular a proposta.", answer="A proposta seguirá para análise manual.")
+    final_decision = {
+        "outcome": "approved",
+        "policy_refs": ["POL-020", "POL-004"],
+        "scenario": {
+            "inputs": {
+                "asset_value": 326_795.20,
+                "amount": 226_795.20,
+                "down_payment": 100_000.0,
+                "term_months": 360,
+            },
+            "calc": {"ltv": 0.694, "dti": 0.30, "monthly_payment": 2_009.99},
+        },
+    }
+    get_db()["applications"].update_one(
+        {"_id": chat_thread},
+        {"$set": {"status": "approved", "final_decision": final_decision}},
+    )
+
+    with TestClient(app) as running_client:
+        graph = running_client.app.state.graph
+        graph.update_state(
+            {"configurable": {"thread_id": chat_thread}},
+            {
+                "messages": [
+                    HumanMessage("Pergunta interna.", additional_kwargs={"persona": "analyst"}),
+                    AIMessage("Parecer interno.", additional_kwargs={"persona": "analyst"}),
+                ]
+            },
+        )
+
+        response = running_client.post("/api/contract", json={"thread_id": chat_thread})
+        assert response.status_code == 200
+        contract_body = response.json()
+        assert [event["status"] for event in contract_body["trace"]] == [
+            "started", "step", "step", "finished"
+        ]
+        assert [event.get("step") for event in contract_body["trace"]] == [
+            None, "checkpoint_confirmation", "contract_update", None
+        ]
+        assert all(event["node"] == "contract_acceptance" for event in contract_body["trace"])
+        assert all(event["source"] == "contract" for event in contract_body["trace"])
+        second = running_client.post("/api/contract", json={"thread_id": chat_thread})
+        assert second.status_code == 200
+        assert second.json()["trace"] == []
+
+        customer_history = running_client.get(
+            f"/api/history/{chat_thread}", params={"persona": "customer"}
+        ).json()["messages"]
+        analyst_history = running_client.get(
+            f"/api/history/{chat_thread}", params={"persona": "analyst"}
+        ).json()["messages"]
+
+    persisted = get_db()["applications"].find_one({"_id": chat_thread})
+    assert persisted["status"] == "approved"
+    assert persisted["final_decision"] == final_decision
+    assert persisted["contract_status"] == "contracted"
+    assert persisted["contracted_at"] is not None
+    assert all("intern" not in message["text"].lower() for message in customer_history)
+    assert [message["text"] for message in analyst_history] == ["Pergunta interna.", "Parecer interno."]
+    assert sum("Aceito contratar" in message["text"] for message in customer_history) == 1
+    assert sum("Aceite registrado" in message["text"] for message in customer_history) == 1
+    stored_trace = get_db()["trace_log"].find_one(
+        {"thread_id": chat_thread, "source": "contract"}
+    )
+    assert stored_trace is not None
+    assert stored_trace["turn_label"] == "Contratação"
+
+
+def test_runtime_trace_restores_only_the_requested_persona(chat_thread):
+    db = get_db()
+    db["trace_log"].insert_many(
+        [
+            {
+                "thread_id": chat_thread,
+                "persona": "customer",
+                "source": "chat",
+                "turn_id": "chat-customer",
+                "turn_label": "Mensagem da cliente",
+                "recorded_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
+                "events": [{"node": "router", "status": "started", "ts": 1.0}],
+            },
+            {
+                "thread_id": chat_thread,
+                "persona": "analyst",
+                "source": "approval",
+                "turn_id": "approval-analyst",
+                "turn_label": "Decisão humana e persistência",
+                "recorded_at": datetime(2026, 1, 2, tzinfo=timezone.utc),
+                "events": [{"node": "persist_decision", "status": "finished", "ts": 2.0}],
+            },
+        ]
+    )
+
+    response = client.get(
+        f"/api/runtime-trace/{chat_thread}", params={"persona": "analyst"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["events"] == [
+        {
+            "node": "persist_decision",
+            "status": "finished",
+            "ts": 2.0,
+            "turn_id": "approval-analyst",
+            "turn_seq": 0,
+            "turn_label": "Decisão humana e persistência",
+            "source": "approval",
+        }
+    ]
+
+
 def test_trace_endpoint_returns_the_persisted_events(chat_thread):
     _chat(chat_thread, "Apartamento de 400 mil com 100 mil de entrada", answer="Olá!")
 
@@ -277,16 +494,13 @@ def test_trace_endpoint_returns_the_persisted_events(chat_thread):
     assert events[0]["seq"] == 1
 
 
-def test_approve_is_still_blocked_on_the_analyst_path(chat_thread):
-    """SDD 11 acceptance — "/api/approve resumes an interrupted thread and the
-    graph reaches `persist_decision`" cannot be asserted yet: `await_approval`
-    and `persist_decision` are session 6, so no thread ever has a pending
-    `interrupt()` to resume.
+def test_approve_without_a_pending_interrupt_fails_closed(chat_thread):
+    """A resume is valid only for a graph paused at `await_approval`.
 
-    `Command(resume=...)` against a thread with nothing suspended does not
-    resume; it starts a fresh run whose only input is the resume value, so
-    `router` gets a state with no `persona`. This is the canary for session 6 —
-    replace it with a real approve test once `await_approval` lands.
+    Against a fresh thread LangGraph starts a run with only the resume value;
+    routing has no persona and fails instead of inventing an approval. The real
+    approval stream and its persistence milestones are covered in
+    `test_sse_mapping.py` and the graph-level interrupt/resume test.
     """
     with pytest.raises(KeyError, match="persona"):
         with TestClient(app) as running_client:
