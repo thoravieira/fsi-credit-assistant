@@ -176,7 +176,7 @@ export function CustomerApp({
           or out of a case: reopen the simulation form, or pull the real
           conversation for this thread from MongoDB (never a local cache). */}
       <div className="flex flex-none items-center justify-between border-b border-[#E7E9E8] bg-white px-3.5 py-2">
-        <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink/55">Nova simulação</span>
+        <span className="text-[11px] font-bold uppercase tracking-[0.04em] text-ink/55">{activeTab.header}</span>
         <div className="flex items-center gap-1.5">
           <button
             onClick={onOpenHistory}

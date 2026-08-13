@@ -196,15 +196,21 @@ export default function ConsolePage() {
                 </div>
               )}
               <ScenarioTable scenarios={scenarios} />
-              {messages.length > 0 && (
-                <ChatThread
-                  messages={messages}
-                  onSend={sendAndReset}
-                  disabled={isStreaming}
-                  placeholder="Pedir recomendação ou contraproposta…"
-                  suggestions={!pendingApproval && !isStreaming ? pickLevers(shownDecision) : undefined}
-                />
-              )}
+              {/* Resolved cases deliberately skip the automatic opening turn,
+                  so their transcript may be empty. Keep the composer visible:
+                  the analyst can still ask for explanations without reopening
+                  or changing the recorded decision. */}
+              <ChatThread
+                messages={messages}
+                onSend={sendAndReset}
+                disabled={isStreaming}
+                placeholder={
+                  alreadyDecided
+                    ? 'Pergunte sobre os detalhes desta decisão…'
+                    : 'Pedir recomendação ou contraproposta…'
+                }
+                suggestions={!alreadyDecided && !pendingApproval && !isStreaming ? pickLevers(shownDecision) : undefined}
+              />
 
               <div className="flex flex-col gap-2.5 border border-charcoal/[0.25] bg-white p-3.5">
                 {pendingApproval ? (
