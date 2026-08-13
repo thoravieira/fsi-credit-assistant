@@ -129,9 +129,9 @@ export function Drawer({ state, onClose }: { state: DrawerState; onClose: () => 
 
         {code && (
           <div>
-            <div className="mb-1.5 flex items-center justify-between gap-2">
-              <span className="text-[9.5px] font-extrabold uppercase tracking-[0.06em] text-charcoal/50">
-                Pseudocódigo explicativo{source && <span className="ml-1.5 font-mono normal-case text-charcoal/40">· fonte real: {source.file}:{source.lines[0]}-{source.lines[1]}</span>}
+            <div className="mb-1.5 flex items-start justify-between gap-2">
+              <span className="min-w-0 flex-1 text-[9.5px] font-extrabold uppercase tracking-[0.06em] text-charcoal/50">
+                Pseudocódigo explicativo{source && <span className="mt-0.5 block break-all font-mono normal-case text-charcoal/40">fonte real: {source.file}:{source.lines[0]}-{source.lines[1]}</span>}
               </span>
               {source && (
                 <a
