@@ -93,6 +93,8 @@ Policy Markdown is retrieved for grounding and explanation. Objective thresholds
 
 LangChain, LangGraph, and Deep Agents are libraries running inside the same Python backend. They are not separate microservices. The foundation model and embedding model are external APIs selected by the backend.
 
+![FSI Credit Assistant solution architecture](docs/diagrams/demo-fsi-agent-mongodb-arch.png)
+
 ```mermaid
 flowchart LR
     subgraph FRONT["Frontend — Next.js"]
@@ -159,6 +161,8 @@ flowchart LR
 | Model providers | OpenAI and Voyage AI | Foundation-model inference and configurable embedding generation |
 
 ## End-to-end flow
+
+![FSI Credit Assistant end-to-end flow](docs/diagrams/demo-fsi-agent-mongodb-flow.png)
 
 ### Customer path
 
