@@ -119,15 +119,22 @@ export function CustomerApp({
 
   return (
     <div className="relative flex h-full flex-col bg-[#F4F5F6]">
-      <div className="grid flex-none grid-cols-[30px_1fr_28px] items-center gap-2 bg-ink px-[18px] pb-3.5 pt-[54px]">
-        <button
-          onClick={() => setProfileOpen(true)}
-          aria-label="Ver dados do cliente"
-          className="flex h-[30px] w-[30px] flex-none items-center justify-center bg-white/[0.12] text-[11.5px] font-bold text-white"
-        >
-          {CUSTOMER_PROFILE.initials}
-        </button>
-        <span className="text-right text-[10.5px] font-semibold uppercase tracking-[0.08em] text-white/45">{activeTab.header}</span>
+      <div className="flex flex-none items-center justify-between bg-ink px-[18px] pb-3.5 pt-[54px]">
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setProfileOpen(true)}
+            aria-label="Ver dados do cliente"
+            className="flex h-[30px] w-[30px] flex-none items-center justify-center bg-white/[0.12] text-[11.5px] font-bold text-white"
+          >
+            {CUSTOMER_PROFILE.initials}
+          </button>
+          <div className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-white/70" title="Cliente premium">
+            <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="#00ED64" stroke="#00ED64" strokeWidth="1.5" strokeLinejoin="round">
+              <path d="m12 2.5 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.1l6.2-.9L12 2.5Z" />
+            </svg>
+            <span>Nível 5</span>
+          </div>
+        </div>
         <button onClick={onBellClick} aria-label="Notificações" className="relative flex h-7 w-7 flex-none items-center justify-center">
           <svg
             width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.5)" strokeWidth="1.8" strokeLinecap="round"
