@@ -95,13 +95,20 @@ export default function ConsolePage() {
   // Carlos's first look at a fresh case: SDD 05 §1 routes an analyst turn on
   // a case still in `review` to `precedent_search` → `analyst_brief`, which
   // is the dossier (recommendation + citations + precedents, SDD 16 §2 beat
-  // 5). Fired once per case per session — a case already in `negotiation`
-  // just gets an ordinary opening turn instead of a second dossier.
+  // 5). Fired once per still-open case per session. Reopening an already
+  // resolved case is read-only: its stored trace and verdict are enough, and
+  // starting another model turn would bury the persistence evidence the
+  // presenter is trying to explain.
   useEffect(() => {
-    if (!selectedId || openedRef.current.has(selectedId)) return;
+    if (
+      !selectedId || !selectedApp || selectedApp.application_id !== selectedId ||
+      openedRef.current.has(selectedId)
+    ) return;
     openedRef.current.add(selectedId);
-    send('Abrir o caso e apresentar o parecer.');
-  }, [selectedId, send]);
+    if (selectedApp.status === 'manual_review') {
+      send('Abrir o caso e apresentar o parecer.');
+    }
+  }, [selectedId, selectedApp, send]);
 
   const pending = useMemo(() => applications.filter((a) => a.status === 'manual_review'), [applications]);
   const approvedList = useMemo(
